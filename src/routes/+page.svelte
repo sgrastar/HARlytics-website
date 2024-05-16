@@ -269,9 +269,6 @@
         font-family: Arial, Helvetica, sans-serif;
         font-size: 75%;
       }
-      header{
-        height: 35px;
-      }
       #action{
         height: 170px;
       }

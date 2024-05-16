@@ -1,12 +1,3 @@
-# HAR Analyzer
-
-This is a tool to help analyze HAR (HTTP Archive File) files. This tool helps with things like analyzing the network and browser cookies being communicated with.
-
-- Analysis of browser cookies
-- Convert network to PlantUML or marmaid format, create sequence diagrams
-
-# License
-
 The MIT License (MIT)
 
 Copyright (c) 2024-present, Yuta Hoshina <yuta@sgrastar.org> (https://github.com/sgrastar/har-analyzer)
