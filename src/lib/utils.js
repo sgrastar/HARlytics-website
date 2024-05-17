@@ -10,11 +10,11 @@ export function formatTimestamp(date) {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
   }
   
-  export function truncateText(text) {
-    if (text.length <= 40) {
+  export function truncateText(text,len) {
+    if (text.length <= len) {
       return text;
     } else {
-      return text.substring(0, 40) + '...';
+      return text.substring(0, len) + '...';
     }
   }
 
@@ -34,24 +34,17 @@ export function formatTimestamp(date) {
     }
   }
   
-  export function exportToCSV(filteredChanges, cookieNames) {
+  export function exportToCSV(data, headers, logFilename) {
     const csvContent = [
-      ['Timestamp', 'URL', ...cookieNames].join(','),
-      ...filteredChanges.map(change => [
-        change.timestamp,
-        change.url,
-        ...cookieNames.map(name => {
-          const cookie = change.cookies.find(cookie => cookie.name === name);
-          return cookie ? cookie.value : '';
-        })
-      ].join(','))
+      headers.join(','),
+      ...data.map(row => row.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(','))
     ].join('\n');
   
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'cookie_changes.csv');
+    link.setAttribute('download', logFilename + '_cookie.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
