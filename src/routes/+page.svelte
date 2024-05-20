@@ -65,11 +65,18 @@
           timestamp: formatTimestamp(new Date(entry.startedDateTime)),
           status: entry.response.status,
           values: entry.request.cookies,
+          requestCookies: entry.request.cookies, // リクエストのCookieを追加
+          responseCookies: entry.response.cookies, // レスポンスのCookieを追加
           type: getCommunicationType(entry)
         };
       });
 
-      selectedValues = new Set(entries.flatMap(entry => entry.values.map(value => value.name)));
+      //selectedValues = new Set(entries.flatMap(entry => entry.values.map(value => value.name)));
+
+      selectedValues = new Set([
+        ...entries.flatMap(entry => entry.requestCookies.map(cookie => cookie.name)),
+        ...entries.flatMap(entry => entry.responseCookies.map(cookie => cookie.name))
+      ]);
       
       statusCounts = entries.reduce((acc, entry) => {
         const statusRange = statusRanges.find(range =>
@@ -157,8 +164,16 @@
     
   });
 
-  $: allValueNames = new Set(entries.flatMap(entry => entry.values.map(value => value.name)));
-  $: valueNames = new Set(filteredEntries.flatMap(entry => entry.values.map(value => value.name)));
+  //$: allValueNames = new Set(entries.flatMap(entry => entry.values.map(value => value.name)));
+  //$: valueNames = new Set(filteredEntries.flatMap(entry => entry.values.map(value => value.name)));
+  $: allValueNames = new Set([
+    ...entries.flatMap(entry => entry.requestCookies.map(cookie => cookie.name)),
+    ...entries.flatMap(entry => entry.responseCookies.map(cookie => cookie.name))
+  ]);
+  $: valueNames = new Set([
+    ...filteredEntries.flatMap(entry => entry.requestCookies.map(cookie => cookie.name)),
+    ...filteredEntries.flatMap(entry => entry.responseCookies.map(cookie => cookie.name))
+  ]);
 
   $: domainOptions = uniqueDomains
     .sort((a, b) => {
@@ -363,7 +378,7 @@ function handleStatusRangeClick(statusRange) {
           {#each communicationTypes as type}
             <Button
               size="xs"
-              class="px-2 py-0.5font-normal"
+              class="px-2 py-0.5 font-normal"
               color={selectedTypes.includes(type) ? 'dark' : 'light'}
               on:click={() => handleTypeClick(type)}
             >
@@ -516,122 +531,149 @@ function handleStatusRangeClick(statusRange) {
           <WindowOutline size="sm" />Cookie
         </div>
         <div id="analyzeCookieDisplay">
-      {#if selectedTypes.length === 0}
-        <p>No data to display.</p>
-      {:else if filteredEntries.length > 0}
-      <table>
-        <thead>
-          <tr>
-            <th class="path">
-              Path
-              {#if filteredEntries.some(entry => entry.path.length > 30)}
-                <button type="button" on:click={togglePathTruncation} aria-label="Toggle path truncation">
-                  {#if isPathTruncated}
-                    <ChevronDoubleRightOutline />
-                  {:else}
-                    <ChevronDoubleLeftOutline />
-                  {/if}
-                </button>
-              {/if}
-            </th>
-            <th class="domain">
-              Domain
-              {#if filteredEntries.some(entry => entry.domain.length > 30)}
-                <button type="button" on:click={toggleDomainTruncation} aria-label="Toggle domain truncation">
-                  {#if isDomainTruncated}
-                    <ChevronDoubleRightOutline />
-                  {:else}
-                    <ChevronDoubleLeftOutline />
-                  {/if}
-                </button>
-              {/if}
-            </th>
-            <th class="type">Type</th>
-            <th class="status">Status</th>
-            <th class="method">Method</th>
-            <th class="timestamp">
-              Timestamp
-              {#if filteredEntries.some(entry => entry.timestamp.length > 10)}
-                <button type="button" on:click={toggleTimestampTruncation} aria-label="Toggle timestamp truncation">
-                  {#if isTimestampTruncated}
-                    <ChevronDoubleRightOutline />
-                  {:else}
-                    <ChevronDoubleLeftOutline />
-                  {/if}
-                </button>
-              {/if}
-            </th>
-            {#each [...allValueNames] as name}
-              {#if valueNames.has(name)}
-                <th>
-                  {#if name.length > 20 || filteredEntries.some(entry => entry.values.find(value => value.name === name && value.value.length > 20))}
-                    <span title={name}>{truncatedValues[name] ? truncateText(name, 20) : name}</span>
-                    <button type="button" on:click={() => toggleValueTruncation(name)} aria-label="Toggle value truncation for {name}">
-                      {#if truncatedValues[name]}
-                        <ChevronDoubleRightOutline />
-                      {:else}
-                        <ChevronDoubleLeftOutline />
-                      {/if}
-                    </button>
-                  {:else}
-                    {name}
-                  {/if}
-                </th>
-              {/if}
-            {/each}
-          </tr>
-        </thead>
-        <tbody>
-          {#each filteredEntries as entry}
-            <tr>
-              <th class="path">
-                {#if entry.path.length > 30}
-                  <span title={entry.domain}{entry.path}>{isPathTruncated ? truncateText(entry.path, 30) : entry.path}</span>
-                {:else}
-                  {entry.path}
-                {/if}
-              </th>
-              <th class="domain">
-                {#if entry.domain.length > 30}
-                  <span title={entry.domain}>{isDomainTruncated ? truncateText(entry.domain, 30) : entry.domain}</span>
-                {:else}
-                  {entry.domain}
-                {/if}
-              </th>
-              <th class="type"><span>{entry.type}</span></th>
-              <th class="status {httpStatusCSSClass(entry.status)}">{entry.status}</th>
-              <th class="method {entry.method}"><span>{entry.method}</span></th>
-              <th class="timestamp">
-                {#if entry.timestamp.length > 10}
-                  <span title={entry.timestamp}>{isTimestampTruncated ? truncateText(entry.timestamp, 10) : entry.timestamp}</span>
-                {:else}
-                  {entry.timestamp}
-                {/if}
-              </th>
-              {#each [...allValueNames] as name}
-                {#if valueNames.has(name)}
-                  <td>
-                    {#if entry.values.find(value => value.name === name)}
-                      {#if selectedValues.has(name)}
-                        {#if name.length > 20 || entry.values.find(value => value.name === name).value.length > 20}
-                          <span title={entry.values.find(value => value.name === name).value}>
-                            {truncatedValues[name] ? truncateText(entry.values.find(value => value.name === name).value, 20) : entry.values.find(value => value.name === name).value}
-                          </span>
+          {#if selectedTypes.length === 0}
+            <p>No data to display.</p>
+          {:else if filteredEntries.length > 0}
+            <table>
+              <thead>
+                <tr>
+                  <th class="path">
+                    Path
+                    {#if filteredEntries.some(entry => entry.path.length > 30)}
+                      <button type="button" on:click={togglePathTruncation} aria-label="Toggle path truncation">
+                        {#if isPathTruncated}
+                          <ChevronDoubleRightOutline />
                         {:else}
-                          {entry.values.find(value => value.name === name).value}
+                          <ChevronDoubleLeftOutline />
                         {/if}
-                      {/if}
+                      </button>
                     {/if}
-                  </td>
-                {/if}
-              {/each}
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-      {:else}
-        <p>No data to display.</p>
-      {/if}
+                  </th>
+                  <th class="domain">
+                    Domain
+                    {#if filteredEntries.some(entry => entry.domain.length > 30)}
+                      <button type="button" on:click={toggleDomainTruncation} aria-label="Toggle domain truncation">
+                        {#if isDomainTruncated}
+                          <ChevronDoubleRightOutline />
+                        {:else}
+                          <ChevronDoubleLeftOutline />
+                        {/if}
+                      </button>
+                    {/if}
+                  </th>
+                  <th class="type">Type</th>
+                  <th class="status">Status</th>
+                  <th class="method">Method</th>
+                  <th class="timestamp">
+                    Timestamp
+                    {#if filteredEntries.some(entry => entry.timestamp.length > 10)}
+                      <button type="button" on:click={toggleTimestampTruncation} aria-label="Toggle timestamp truncation">
+                        {#if isTimestampTruncated}
+                          <ChevronDoubleRightOutline />
+                        {:else}
+                          <ChevronDoubleLeftOutline />
+                        {/if}
+                      </button>
+                    {/if}
+                  </th>
+                  {#each [...allValueNames] as name}
+                    {#if valueNames.has(name)}
+                      <th colspan="2">
+                        {#if name.length > 20 || filteredEntries.some(entry => entry.requestCookies.find(cookie => cookie.name === name && cookie.value.length > 20) || entry.responseCookies.find(cookie => cookie.name === name && cookie.value.length > 20))}
+                          <span title={name}>{truncatedValues[name] ? truncateText(name, 20) : name}</span>
+                          <button type="button" on:click={() => toggleValueTruncation(name)} aria-label="Toggle value truncation for {name}">
+                            {#if truncatedValues[name]}
+                              <ChevronDoubleRightOutline />
+                            {:else}
+                              <ChevronDoubleLeftOutline />
+                            {/if}
+                          </button>
+                        {:else}
+                          {name}
+                        {/if}
+                      </th>
+                    {/if}
+                  {/each}
+                </tr>
+                <tr>
+                  <th class="path"></th>
+                  <th class="domain"></th>
+                  <th class="type"></th>
+                  <th class="status"></th>
+                  <th class="method"></th>
+                  <th class="timestamp"></th>
+                  {#each [...allValueNames] as name}
+                    {#if valueNames.has(name)}
+                      <th>Request</th>
+                      <th>Response</th>
+                    {/if}
+                  {/each}
+                </tr>
+              </thead>
+              <tbody>
+                {#each filteredEntries as entry}
+                  <tr>
+                    <th class="path">
+                      {#if entry.path.length > 30}
+                        <span title={entry.domain}{entry.path}>{isPathTruncated ? truncateText(entry.path, 30) : entry.path}</span>
+                      {:else}
+                        {entry.path}
+                      {/if}
+                    </th>
+                    <th class="domain">
+                      {#if entry.domain.length > 30}
+                        <span title={entry.domain}>{isDomainTruncated ? truncateText(entry.domain, 30) : entry.domain}</span>
+                      {:else}
+                        {entry.domain}
+                      {/if}
+                    </th>
+                    <th class="type"><span>{entry.type}</span></th>
+                    <th class="status {httpStatusCSSClass(entry.status)}">{entry.status}</th>
+                    <th class="method {entry.method}"><span>{entry.method}</span></th>
+                    <th class="timestamp">
+                      {#if entry.timestamp.length > 10}
+                        <span title={entry.timestamp}>{isTimestampTruncated ? truncateText(entry.timestamp, 10) : entry.timestamp}</span>
+                      {:else}
+                        {entry.timestamp}
+                      {/if}
+                    </th>
+                    {#each [...allValueNames] as name}
+                      {#if valueNames.has(name)}
+                        {@const requestCookie = entry.requestCookies.find(cookie => cookie.name === name)}
+                        {@const responseCookie = entry.responseCookies.find(cookie => cookie.name === name)}
+                        {@const requestValue = requestCookie ? requestCookie.value : ''}
+                        {@const responseValue = responseCookie ? responseCookie.value : ''}
+                        <td>
+                          {#if requestValue}
+                            {#if requestValue.length > 20}
+                              <span title={requestValue}>
+                                {truncatedValues[name] ? truncateText(requestValue, 20) : requestValue}
+                              </span>
+                            {:else}
+                              {requestValue}
+                            {/if}
+                          {/if}
+                        </td>
+                        <td>
+                          {#if responseValue}
+                            {#if responseValue.length > 20}
+                              <span title={responseValue}>
+                                {truncatedValues[name] ? truncateText(responseValue, 20) : responseValue}
+                              </span>
+                            {:else}
+                              {responseValue}
+                            {/if}
+                          {/if}
+                        </td>
+                      {/if}
+                    {/each}
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          {:else}
+            <p>No data to display.</p>
+          {/if}
         </div>
       </TabItem>
     </Tabs>
