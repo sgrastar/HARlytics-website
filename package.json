@@ -15,6 +15,7 @@
 		"flowbite": "^2.3.0",
 		"flowbite-svelte": "^0.46.1",
 		"flowbite-svelte-icons": "^1.6.1",
+		"mermaid": "^10.9.1",
 		"postcss": "^8.4.38",
 		"svelte": "^4.2.7",
 		"sveltekit-adapter-chrome-extension": "^2.0.1",

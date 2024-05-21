@@ -33,6 +33,40 @@ export function formatTimestamp(date) {
       return "other";
     }
   }
+
+  export function formatTime(time) {
+    let formattedTime = '';
+  
+    if (time < 1000) {
+      formattedTime = time.toFixed(0) + " ms";
+    } else if (time < 60000) {
+      formattedTime = (time / 1000).toFixed(2) + " s";
+    } else if (time < 3600000) {
+      const minutes = Math.floor(time / 60000);
+      const seconds = ((time % 60000) / 1000).toFixed(0);
+      formattedTime = minutes + " min " + (seconds < 10 ? '0' : '') + seconds + " s";
+    } else {
+      const hours = Math.floor(time / 3600000);
+      const minutes = Math.floor((time % 3600000) / 60000);
+      const seconds = ((time % 60000) / 1000).toFixed(0);
+      formattedTime = hours + " h " + (minutes < 10 ? '0' : '') + minutes + " min " + (seconds < 10 ? '0' : '') + seconds + " s";
+    }
+  
+    return formattedTime;
+  }
+
+  export function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+  
+    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const sign = Math.sign(bytes);
+    bytes = Math.abs(bytes);
+  
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    const value = (bytes / Math.pow(1024, i)).toFixed(1);
+  
+    return sign * value + ' ' + units[i];
+  }
   
   export function exportToCSV(data, headers, logFilename) {
     const csvContent = [

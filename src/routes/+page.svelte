@@ -1,8 +1,9 @@
 <script>
   import { onMount } from 'svelte';
-  import { formatTimestamp, truncateText, httpStatusCSSClass, exportToCSV } from '$lib/utils';
-  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect } from 'flowbite-svelte';
+  import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
+  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Accordion, AccordionItem, Textarea, Checkbox } from 'flowbite-svelte';
   import { ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
+  import mermaid from 'mermaid';
 
   let logFilename = '';
   let logVersion = '';
@@ -21,7 +22,13 @@
   let isPathTruncated = true;
   let isDomainTruncated = true;
   let isTimestampTruncated = true;
+  let showRequestCookies = true;
+  let showResponseCookies = true;
   let truncatedValues = {};
+
+  let mermaidSvg = '';
+  let plantUMLCode = '';
+  let mermaidCode = '';
 
   const statusRanges = [
     { label: '100', min: 100, max: 199 },
@@ -38,8 +45,15 @@
   let selectedTypes = [...communicationTypes];
   let selectedValues = new Set();
 
+  mermaid.initialize({ startOnLoad: false });
+
   onMount(() => {
     // initialize
+    console.log(filteredEntries);
+    mermaid.initialize({ startOnLoad: false });
+    if (filteredEntries.length != 0) {
+      renderMermaidDiagram();
+    }
   });
 
   function analyzeHAR(event) {
@@ -52,21 +66,31 @@
       entries = harContent.log.entries;
       logVersion = harContent.log.version;
       logCreator = harContent.log.creator.name + "(" +  harContent.log.creator.version +  ")";
+      
 
       entries = entries.map(entry => {
         const url = new URL(entry.request.url);
         const domain = url.hostname;
         const path = url.pathname;
+
+        const setCookieCount = entry.response.headers.filter(header => header.name.toLowerCase() === 'set-cookie').length;
+
         return {
           url: entry.request.url,
           method: entry.request.method,
           domain: domain,
           path: path,
+          time: entry.time,
+          timings: entry.timings,
+          responseHeaderSize: entry.response.headersSize,
+          responseBodySize: entry.response.bodySize,
+          responseTotalSize: ((entry.response.headersSize + entry.response.bodySize) > 0) ? entry.response.headersSize + entry.response.bodySize : 0,
           timestamp: formatTimestamp(new Date(entry.startedDateTime)),
           status: entry.response.status,
           values: entry.request.cookies,
-          requestCookies: entry.request.cookies, // リクエストのCookieを追加
+          requestCookies: entry.request.cookies, // リクエストのCookieを追加a
           responseCookies: entry.response.cookies, // レスポンスのCookieを追加
+          setCookieCount: setCookieCount,
           type: getCommunicationType(entry)
         };
       });
@@ -186,6 +210,30 @@
       name: `${domain} (${domainCounts[domain] || 0})`
     }));
 
+  $: {
+    console.log(filteredEntries);
+    if (filteredEntries) {
+      mermaidCode = generateMermaidSequence();
+      plantUMLCode = generatePlantUMLSequence();
+      if (filteredEntries.length !== 0) {
+        //renderMermaidDiagram();
+      } else {
+        mermaidSvg = '';
+      }
+    }
+  }
+
+  $: {
+    if (showRequestCookies || showResponseCookies) {
+      if (filteredEntries && filteredEntries.length !== 0) {
+        plantUMLCode = generatePlantUMLSequence();
+        mermaidCode = generateMermaidSequence();
+        //renderMermaidDiagram();
+      }
+    }
+  }
+
+
   function toggleUrlTruncation() {
     isUrlTruncated = !isUrlTruncated;
   }
@@ -274,6 +322,11 @@ function handleStatusRangeClick(statusRange) {
     }, 1000);
   }
 
+  function copyTextarea(elemId) {
+    var element = document.getElementById(elemId);
+    navigator.clipboard.writeText(element.value)
+  }
+
 
   function handleValueChange(event, valueName) {
     if (event.target.checked) {
@@ -282,6 +335,91 @@ function handleStatusRangeClick(statusRange) {
       selectedValues.delete(valueName);
     }
   }
+
+
+
+  function renderMermaidDiagram() {
+    console.log("render");
+    mermaid.render('mermaid-diagram', mermaidCode, (svg) => {
+      mermaidSvg = svg;
+    });
+  }
+
+  function generateMermaidSequence() {
+    if (!filteredEntries || filteredEntries.length === 0) {
+      return '';
+    }
+
+    let mermaidCode = 'sequenceDiagram\n';
+
+    filteredEntries.forEach(entry => {
+      const truncatedPath = truncateText(entry.path, 70);
+      const requestArrow = `[${entry.method}] ${truncatedPath}`;
+      const responseArrow = `${entry.status} - ${entry.type}`;
+
+      mermaidCode += `  Browser->${entry.domain}: ${requestArrow}\n`;
+      mermaidCode += `  activate ${entry.domain}\n`;
+
+      if (showRequestCookies && entry.requestCookies.length > 0) {
+        const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
+        mermaidCode += `  note over ${entry.domain}: Request Cookies:\\n${cookieString}\n`;
+      }
+
+      mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
+
+      mermaidCode += `  deactivate ${entry.domain}\n`;
+
+      if (showResponseCookies && entry.responseCookies.length > 0) {
+        const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
+        mermaidCode += `  note over Browser: Response Cookies:\\n${cookieString}\n`;
+      }
+    });
+
+    return mermaidCode;
+  }
+
+  function generatePlantUMLSequence() {
+    if (!filteredEntries || filteredEntries.length === 0) {
+      return '';
+    }
+
+    let plantUMLCode = '@startuml\n';
+
+    filteredEntries.forEach(entry => {
+      const truncatedPath = truncateText(entry.path, 70);
+      const requestArrow = `${entry.method} ${truncatedPath}`;
+      const responseArrow = `${entry.status} - ${entry.type}`;
+
+      plantUMLCode += `Browser -> "${entry.domain}": ${requestArrow}\n`;
+      plantUMLCode += `activate "${entry.domain}"\n`;
+
+      if (showRequestCookies && entry.requestCookies.length > 0) {
+        const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('\\n');
+        plantUMLCode += `note over "${entry.domain}": **Request Cookies**:\\n${cookieString}\n`;
+      }
+
+      if( entry.status >= 300 && entry.status <= 399){
+        plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
+      }else if( entry.status >= 400 && entry.status <= 599){
+        plantUMLCode += `"${entry.domain}" --> Browser !!: ${responseArrow}\n`;
+      }else{
+        plantUMLCode += `"${entry.domain}" -> Browser: ${responseArrow}\n`;
+      }
+
+      //plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
+
+      if (showResponseCookies && entry.responseCookies.length > 0) {
+        const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('\\n');
+        plantUMLCode += `note over Browser: **Response Cookies**:\\n${cookieString}\n`;
+      }
+
+      plantUMLCode += `deactivate "${entry.domain}"\n`;
+    });
+
+    plantUMLCode += '@enduml';
+    return plantUMLCode;
+  }
+
 </script>
 <main class="p-4">
   <div id="action">
@@ -350,7 +488,7 @@ function handleStatusRangeClick(statusRange) {
           {#each statusRanges as statusRange}
             <Button
               size="xs"
-              class="px-2 py-0.5 font-normal"
+              class="px-2 py-0.5 font-light"
               color={selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}
               on:click={() => handleStatusRangeClick(statusRange)}
             >
@@ -378,7 +516,7 @@ function handleStatusRangeClick(statusRange) {
           {#each communicationTypes as type}
             <Button
               size="xs"
-              class="px-2 py-0.5 font-normal"
+              class="px-2 py-0.5 font-light"
               color={selectedTypes.includes(type) ? 'dark' : 'light'}
               on:click={() => handleTypeClick(type)}
             >
@@ -397,7 +535,7 @@ function handleStatusRangeClick(statusRange) {
         </div>
         <div id="analyzeOverviewDisplay"></div>
       </TabItem>
-      <TabItem >
+      <TabItem open>
         <div slot="title" class="flex items-center gap-2">
           <BarsFromLeftOutline size="sm" />Detail
         </div>
@@ -410,7 +548,7 @@ function handleStatusRangeClick(statusRange) {
               <tr>
                 <th class="path">
                   Path
-                  {#if filteredEntries.some(entry => entry.path.length > 30)}
+                  {#if filteredEntries.some(entry => entry.path.length > 50)}
                     <button type="button" on:click={togglePathTruncation} aria-label="Toggle path truncation">
                       {#if isPathTruncated}
                         <ChevronDoubleRightOutline />
@@ -447,32 +585,23 @@ function handleStatusRangeClick(statusRange) {
                     </button>
                   {/if}
                 </th>
-                {#each [...allValueNames] as name}
-                  {#if valueNames.has(name)}
-                    <th>
-                      {#if name.length > 20 || filteredEntries.some(entry => entry.values.find(value => value.name === name && value.value.length > 20))}
-                        <span title={name}>{truncatedValues[name] ? truncateText(name, 20) : name}</span>
-                        <button type="button" on:click={() => toggleValueTruncation(name)} aria-label="Toggle value truncation for {name}">
-                          {#if truncatedValues[name]}
-                            <ChevronDoubleRightOutline />
-                          {:else}
-                            <ChevronDoubleLeftOutline />
-                          {/if}
-                        </button>
-                      {:else}
-                        {name}
-                      {/if}
-                    </th>
-                  {/if}
-                {/each}
+                <th>Set Cookies</th>
+                <th>Time</th>
+                <th>Size</th>
+                <th>dns</th>
+                <th>connect</th>
+                <th>ssl</th>
+                <th>send</th>
+                <th>wait</th>
+                <th>receive</th>
               </tr>
             </thead>
             <tbody>
               {#each filteredEntries as entry}
                 <tr>
                   <th class="path">
-                    {#if entry.path.length > 30}
-                      <span title={entry.domain}{entry.path}>{isPathTruncated ? truncateText(entry.path, 30) : entry.path}</span>
+                    {#if entry.path.length > 50}
+                      <span title={entry.domain}{entry.path}>{isPathTruncated ? truncateText(entry.path, 50) : entry.path}</span>
                     {:else}
                       {entry.path}
                     {/if}
@@ -494,26 +623,21 @@ function handleStatusRangeClick(statusRange) {
                       {entry.timestamp}
                     {/if}
                   </th>
-                  {#each [...allValueNames] as name}
-                    {#if valueNames.has(name)}
-                      <td>
-                        {#if entry.values.find(value => value.name === name)}
-                          {#if selectedValues.has(name)}
-                            {#if name.length > 20 || entry.values.find(value => value.name === name).value.length > 20}
-                              <span title={entry.values.find(value => value.name === name).value}>
-                                {truncatedValues[name] ? truncateText(entry.values.find(value => value.name === name).value, 20) : entry.values.find(value => value.name === name).value}
-                              </span>
-                            {:else}
-                              {entry.values.find(value => value.name === name).value}
-                            {/if}
-                          {/if}
-                        {/if}
-                      </td>
-                    {/if}
-                  {/each}
+                  <td class="setCookies">{entry.setCookieCount}</td>
+                  <td class="time">{formatTime(entry.time)}</td>
+                  <td class="size">{formatBytes(entry.responseTotalSize)}</td>
+                  <td class="dns">{entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : ''}</td>
+                  <td class="connect">{entry.timings.connect >= 0 ? formatTime(entry.timings.connect) : ''}</td>
+                  <td class="ssl">{entry.timings.ssl >= 0 ? formatTime(entry.timings.ssl) : ''}</td>
+                  <td class="send">{formatTime(entry.timings.send)}</td>
+                  <td class="wait">{formatTime(entry.timings.wait)}</td>
+                  <td class="receive">{formatTime(entry.timings.receive)}</td>
                 </tr>
               {/each}
             </tbody>
+            <tfoot>
+              <th></th>
+            </tfoot>
           </table>
           {:else}
             <p>No data to display.</p>
@@ -524,9 +648,45 @@ function handleStatusRangeClick(statusRange) {
         <div slot="title" class="flex items-center gap-2">
           <DrawSquareOutline size="sm" />Sequence
         </div>
-        <div id="analyzeSequenceDisplay"></div>
+        <div id="analyzeSequenceDisplay" class="grid grid-cols-12">
+          <div class="col-span-2 bg-gray-100 p-4 h-[60vh] rounded">
+            <h3 class="text-lg font-semibold mb-4">Sequence Diagram Settings</h3>
+            <div class="mb-4">
+              <Checkbox bind:checked={showRequestCookies}>Show Request Cookies</Checkbox>
+            </div>
+            <div class="mb-4">
+              <Checkbox bind:checked={showResponseCookies}>Show Response Cookies</Checkbox>
+            </div>
+          </div>
+          <div class="col-span-8 p-4">
+            <h3 class="text-lg font-semibold">Mermaid Sequence Preview</h3>
+            {@html mermaidSvg}
+          </div>
+          <div class="col-span-2 p-4 h-[60vh] overflow-auto">
+            <div class="space-x-1">
+              <div>
+                <h4>PlantUML Sequence Code</h4>
+                <Button
+                size="xs"
+                class="px-2 py-0.5 font-light"
+                on:click={() => copyTextarea("plantUMLCodeTextarea")}
+                >Copy</Button>
+              </div>
+              <Textarea class="mb-4" id="plantUMLCodeTextarea" rows="7" readonly bind:value={plantUMLCode}></Textarea> 
+            </div>
+            <div>
+              <h4>Mermaid Sequence Code</h4>
+              <Button
+              size="xs"
+              class="px-2 py-0.5 font-light"
+              on:click={() => copyTextarea("mermaidCodeTextarea")}
+              >Copy</Button>
+              <Textarea rows="7" id="mermaidCodeTextarea" readonly bind:value={mermaidCode}></Textarea>
+            </div>
+          </div>
+        </div>
       </TabItem>
-      <TabItem open>
+      <TabItem>
         <div slot="title" class="flex items-center gap-2">
           <WindowOutline size="sm" />Cookie
         </div>
@@ -700,18 +860,23 @@ function handleStatusRangeClick(statusRange) {
     height: 53vh;
     overflow: scroll;
   }
-  table {
+  #analyzeDetailDisplay table {
+    border-collapse: collapse;
+    border: none;
+  }
+  #analyzeCookieDisplay table {
     border-collapse: collapse;
     width: 100%;
+    border: none;
   }
   th, td {
-    border: 1px solid black;
+    /*border: 1px solid black;*/
     padding: 3px 8px;
     text-align: left;
     white-space: nowrap;
   }
 
-  thead th {
+  thead {
     position: -webkit-sticky;
     position: sticky;
     top: 0;
@@ -806,6 +971,17 @@ function handleStatusRangeClick(statusRange) {
   }
   tbody th.status.cliError {
       background: rgb(255, 153, 161);
+  }
+  tbody td.setCookies,
+  tbody td.time,
+  tbody td.size,
+  tbody td.dns,
+  tbody td.connect,
+  tbody td.ssl,
+  tbody td.send,
+  tbody td.wait,
+  tbody td.receive {
+      text-align: right;
   }
 
   .truncate-icon {
