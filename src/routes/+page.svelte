@@ -22,8 +22,11 @@
   let isPathTruncated = true;
   let isDomainTruncated = true;
   let isTimestampTruncated = true;
-  let showRequestCookies = true;
-  let showResponseCookies = true;
+  let addRequestCookies = true;
+  let addResponseCookies = true;
+  let addAutoNumber = false;
+  let addTitle = true;
+  let sequenceTitle =''; 
   let truncatedValues = {};
 
   let mermaidSvg = '';
@@ -31,12 +34,12 @@
   let mermaidCode = '';
 
   const statusRanges = [
-    { label: '100', min: 100, max: 199 },
+    //{ label: '100', min: 100, max: 199 },
     { label: '200', min: 200, max: 299 },
     { label: '300', min: 300, max: 399 },
     { label: '400', min: 400, max: 499 },
     { label: '500', min: 500, max: 599 },
-    { label: 'Other', min: 0, max: 99, other: true },
+    { label: 'Other', min: 0, max: 199, other: true },
   ];
   let selectedStatusRanges = [...statusRanges];
   let allStatusSelected = true;
@@ -45,11 +48,12 @@
   let selectedTypes = [...communicationTypes];
   let selectedValues = new Set();
 
-  mermaid.initialize({ startOnLoad: false });
+  //mermaid.initialize({ startOnLoad: false });
 
   onMount(() => {
     // initialize
-    console.log(filteredEntries);
+    //console.log(filteredEntries);
+
     mermaid.initialize({ startOnLoad: false });
     if (filteredEntries.length != 0) {
       renderMermaidDiagram();
@@ -82,6 +86,7 @@
           path: path,
           time: entry.time,
           timings: entry.timings,
+          requestBodySize: entry.request.bodySize,
           responseHeaderSize: entry.response.headersSize,
           responseBodySize: entry.response.bodySize,
           responseTotalSize: ((entry.response.headersSize + entry.response.bodySize) > 0) ? entry.response.headersSize + entry.response.bodySize : 0,
@@ -91,7 +96,10 @@
           requestCookies: entry.request.cookies, // リクエストのCookieを追加a
           responseCookies: entry.response.cookies, // レスポンスのCookieを追加
           setCookieCount: setCookieCount,
-          type: getCommunicationType(entry)
+          type: getCommunicationType(entry),
+          responseMimeType: entry.response.content.mimeType ? entry.response.content.mimeType.split(';')[0] : ''
+          //responseMimeType: getCommunicationType(entry)
+          
         };
       });
 
@@ -128,6 +136,11 @@
       selectedValues.forEach(valueName => {
         truncatedValues[valueName] = true;
       });
+
+      sequenceTitle = "Sequence: "+logFilename;
+
+      const connectionSpeed = estimateConnectionSpeed(entries);
+      console.log(connectionSpeed);
     };
 
     reader.readAsText(file);
@@ -224,8 +237,10 @@
   }
 
   $: {
-    if (showRequestCookies || showResponseCookies) {
+    if (addRequestCookies || addResponseCookies || addAutoNumber || addTitle || sequenceTitle) {
+      console.log("checkbox");
       if (filteredEntries && filteredEntries.length !== 0) {
+        console.log("checkbox and filter");
         plantUMLCode = generatePlantUMLSequence();
         mermaidCode = generateMermaidSequence();
         //renderMermaidDiagram();
@@ -255,24 +270,37 @@
   }
 
   function handleExportCSV() {
-  const csvData = filteredEntries.map(entry => [
-    entry.path,
-    entry.domain,
-    entry.type,
-    entry.status,
-    entry.method,
-    entry.timestamp,
-    ...[...allValueNames].map(name => {
-      if (entry.values) {
-        const value = entry.values.find(value => value.name === name);
-        return value && selectedValues.has(name) ? value.value : '';
-      } else {
-        return '';
-      }
-    })
-  ]);
-  exportToCSV(csvData, ['Path', 'Domain', 'Type', 'Status', 'Method', 'Timestamp', ...allValueNames], logFilename);
-}
+    const csvData = filteredEntries.map(entry => [
+      entry.path,
+      entry.domain,
+      entry.type,
+      entry.status,
+      entry.method,
+      entry.timestamp,
+      ...[...valueNames].flatMap(name => {
+        const requestCookie = entry.requestCookies.find(cookie => cookie.name === name);
+        const responseCookie = entry.responseCookies.find(cookie => cookie.name === name);
+        return [
+          selectedValues.has(name) && requestCookie ? requestCookie.value : '',
+          selectedValues.has(name) && responseCookie ? responseCookie.value : ''
+        ];
+      })
+    ]);
+
+    exportToCSV(
+      csvData,
+      [
+        'Path',
+        'Domain',
+        'Type',
+        'Status',
+        'Method',
+        'Timestamp',
+        ...[...valueNames].flatMap(name => [`${name}(Req)`, `${name}(Res)`])
+      ],
+      logFilename
+    );
+  }
 
 function handleStatusRangeClick(statusRange) {
     if (selectedStatusRanges.includes(statusRange)) {
@@ -337,13 +365,20 @@ function handleStatusRangeClick(statusRange) {
   }
 
 
+  const renderMermaidDiagram = async function () {
+    element = document.querySelector('#testDiv');
+    const { svg } = await mermaid.render('testDiv', mermaidCode);
+    element.innerHTML = svg;
+  };
 
+/*
   function renderMermaidDiagram() {
     console.log("render");
     mermaid.render('mermaid-diagram', mermaidCode, (svg) => {
       mermaidSvg = svg;
     });
   }
+*/
 
   function generateMermaidSequence() {
     if (!filteredEntries || filteredEntries.length === 0) {
@@ -352,24 +387,35 @@ function handleStatusRangeClick(statusRange) {
 
     let mermaidCode = 'sequenceDiagram\n';
 
+    if (addAutoNumber) {
+      mermaidCode += "autonumber\n";
+    }
+
     filteredEntries.forEach(entry => {
       const truncatedPath = truncateText(entry.path, 70);
       const requestArrow = `[${entry.method}] ${truncatedPath}`;
-      const responseArrow = `${entry.status} - ${entry.type}`;
+      const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
 
       mermaidCode += `  Browser->${entry.domain}: ${requestArrow}\n`;
       mermaidCode += `  activate ${entry.domain}\n`;
 
-      if (showRequestCookies && entry.requestCookies.length > 0) {
+      if (addRequestCookies && entry.requestCookies.length > 0) {
         const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
         mermaidCode += `  note over ${entry.domain}: Request Cookies:\\n${cookieString}\n`;
       }
 
-      mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
+      //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
+      if( entry.status >= 300 && entry.status <= 399){
+        mermaidCode += `${entry.domain} --> Browser: ${responseArrow}\n`;
+      }else if( entry.status >= 400 && entry.status <= 599){
+        mermaidCode += `${entry.domain} --x Browser: ${responseArrow}\n`;
+      }else{
+        mermaidCode += `${entry.domain} -> Browser: ${responseArrow}\n`;
+      }
 
       mermaidCode += `  deactivate ${entry.domain}\n`;
 
-      if (showResponseCookies && entry.responseCookies.length > 0) {
+      if (addResponseCookies && entry.responseCookies.length > 0) {
         const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
         mermaidCode += `  note over Browser: Response Cookies:\\n${cookieString}\n`;
       }
@@ -380,20 +426,31 @@ function handleStatusRangeClick(statusRange) {
 
   function generatePlantUMLSequence() {
     if (!filteredEntries || filteredEntries.length === 0) {
+      console.log("no return");
       return '';
     }
 
+    console.log("run plantuml generete");
+
     let plantUMLCode = '@startuml\n';
+
+    if (addTitle) {
+      console.log(sequenceTitle);
+      plantUMLCode += `title: ${sequenceTitle}\n`;
+    }
+    if (addAutoNumber) {
+      plantUMLCode += "autonumber\n";
+    }
 
     filteredEntries.forEach(entry => {
       const truncatedPath = truncateText(entry.path, 70);
       const requestArrow = `${entry.method} ${truncatedPath}`;
-      const responseArrow = `${entry.status} - ${entry.type}`;
+      const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
 
       plantUMLCode += `Browser -> "${entry.domain}": ${requestArrow}\n`;
       plantUMLCode += `activate "${entry.domain}"\n`;
 
-      if (showRequestCookies && entry.requestCookies.length > 0) {
+      if (addRequestCookies && entry.requestCookies.length > 0) {
         const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('\\n');
         plantUMLCode += `note over "${entry.domain}": **Request Cookies**:\\n${cookieString}\n`;
       }
@@ -408,7 +465,7 @@ function handleStatusRangeClick(statusRange) {
 
       //plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
 
-      if (showResponseCookies && entry.responseCookies.length > 0) {
+      if (addResponseCookies && entry.responseCookies.length > 0) {
         const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('\\n');
         plantUMLCode += `note over Browser: **Response Cookies**:\\n${cookieString}\n`;
       }
@@ -419,6 +476,100 @@ function handleStatusRangeClick(statusRange) {
     plantUMLCode += '@enduml';
     return plantUMLCode;
   }
+
+
+function estimateConnectionSpeed(entries) {
+  const validEntries = entries.filter(entry => {
+    return entry.status >= 200 && entry.status < 300;
+  });
+
+  const upSpeeds = validEntries
+    .filter(entry => entry.requestBodySize > 0 && entry.timings.send > 0)
+    .map(entry => {
+      const bodySize = entry.requestBodySize;
+      const time = entry.timings.send / 1000;
+      const speed = bodySize * 8 / time;
+      return { speed, url: removeQueryString(entry.url) };
+    });
+
+  const downSpeeds = validEntries
+    .filter(entry => entry.responseBodySize > 0 && entry.timings.receive > 0)
+    .map(entry => {
+      const bodySize = entry.responseBodySize;
+      const time = entry.timings.receive / 1000;
+      const speed = bodySize * 8 / time;
+      return { speed, url: removeQueryString(entry.url) };
+    });
+
+  const trimmedUpSpeeds = trimOutliers(upSpeeds.map(item => item.speed));
+  const trimmedDownSpeeds = trimOutliers(downSpeeds.map(item => item.speed));
+
+  const uploadData = upSpeeds.length > 0 ? {
+    maxSpeed: formatSpeed(Math.max(...upSpeeds.map(item => item.speed))),
+    maxSpeedUrl: upSpeeds.find(item => item.speed === Math.max(...upSpeeds.map(item => item.speed))).url,
+    minSpeed: formatSpeed(Math.min(...upSpeeds.map(item => item.speed))),
+    minSpeedUrl: upSpeeds.find(item => item.speed === Math.min(...upSpeeds.map(item => item.speed))).url,
+    avgSpeed: formatSpeed(getAverage(trimmedUpSpeeds)),
+    medianSpeed: formatSpeed(getMedian(trimmedUpSpeeds)),
+    trimmedAvgSpeed: formatSpeed(getAverage(trimmedUpSpeeds)),
+    trimmedMedianSpeed: formatSpeed(getMedian(trimmedUpSpeeds))
+  } : {};
+
+  const downloadData = downSpeeds.length > 0 ? {
+    maxSpeed: formatSpeed(Math.max(...downSpeeds.map(item => item.speed))),
+    maxSpeedUrl: downSpeeds.find(item => item.speed === Math.max(...downSpeeds.map(item => item.speed))).url,
+    minSpeed: formatSpeed(Math.min(...downSpeeds.map(item => item.speed))),
+    minSpeedUrl: downSpeeds.find(item => item.speed === Math.min(...downSpeeds.map(item => item.speed))).url,
+    avgSpeed: formatSpeed(getAverage(trimmedDownSpeeds)),
+    medianSpeed: formatSpeed(getMedian(trimmedDownSpeeds)),
+    trimmedAvgSpeed: formatSpeed(getAverage(trimmedDownSpeeds)),
+    trimmedMedianSpeed: formatSpeed(getMedian(trimmedDownSpeeds))
+  } : {};
+
+  return {
+    upload: uploadData,
+    download: downloadData
+  };
+}
+
+function removeQueryString(url) {
+  return url.split('?')[0];
+}
+
+function trimOutliers(data, threshold = 0.1) {
+  const sortedData = [...data].sort((a, b) => a - b);
+  const n = sortedData.length;
+  const lowIndex = Math.floor(n * threshold);
+  const highIndex = Math.ceil(n * (1 - threshold)) - 1;
+  return sortedData.slice(lowIndex, highIndex + 1);
+}
+
+function getAverage(arr) {
+  if (arr.length === 0) {
+    return 0;
+  }
+  const sum = arr.reduce((acc, val) => acc + val, 0);
+  return sum / arr.length;
+}
+
+function getMedian(arr) {
+  if (arr.length === 0) {
+    return 0;
+  }
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function formatSpeed(bps) {
+  if (bps < 1000) {
+    return `${bps.toFixed(2)} bps`;
+  } else if (bps < 1000000) {
+    return `${(bps / 1000).toFixed(2)} Kbps`;
+  } else {
+    return `${(bps / 1000000).toFixed(2)} Mbps`;
+  }
+}
 
 </script>
 <main class="p-4">
@@ -471,8 +622,8 @@ function handleStatusRangeClick(statusRange) {
 
     <div id="filters" class="grid grid-cols-12 flex items-center space-x-1">
 
-      <div id="filterStatus" class="col-span-5 grid grid-cols-12 gap-4 p-2 flex items-center bg-gray-100 rounded">
-        <div class="col-span-3 grid grid-cols-6 flex items-center">
+      <div id="filterStatus" class="col-span-4 grid grid-cols-12 gap-4 p-2 flex items-center bg-gray-100 rounded">
+        <div class="col-span-4 grid grid-cols-6 flex items-center">
           <div class="col-span-4 flex justify-center content-center">
             <span class="font-bold">Status Filter</span>
           </div>
@@ -484,11 +635,11 @@ function handleStatusRangeClick(statusRange) {
           </div>
         </div>
     
-        <div class="col-span-9 flex space-x-1">
+        <div class="col-span-8 flex space-x-1">
           {#each statusRanges as statusRange}
             <Button
               size="xs"
-              class="px-2 py-0.5 font-light"
+              class="px-2 py-0.5 font-light {selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}"
               color={selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}
               on:click={() => handleStatusRangeClick(statusRange)}
             >
@@ -501,7 +652,7 @@ function handleStatusRangeClick(statusRange) {
         </div>
       </div>
   
-      <div id="filterType" class="col-span-7 grid grid-cols-12 gap-4 p-2 flex items-center bg-gray-100 rounded">
+      <div id="filterType" class="col-span-8 grid grid-cols-12 gap-4 p-2 flex items-center bg-gray-100 rounded">
         <div class="text-right content-center">
           <span class="font-bold">Type Filter</span>
         </div>
@@ -571,6 +722,7 @@ function handleStatusRangeClick(statusRange) {
                   {/if}
                 </th>
                 <th class="type">Type</th>
+                <th class="type">mimeType</th>
                 <th class="status">Status</th>
                 <th class="method">Method</th>
                 <th class="timestamp">
@@ -613,7 +765,8 @@ function handleStatusRangeClick(statusRange) {
                       {entry.domain}
                     {/if}
                   </th>
-                  <th class="type"><span>{entry.type}</span></th>
+                  <th class="minetype"><span>{entry.type}</span></th>
+                  <th class="minetype"><span>{entry.responseMimeType}</span></th>
                   <th class="status {httpStatusCSSClass(entry.status)}">{entry.status}</th>
                   <th class="method {entry.method}"><span>{entry.method}</span></th>
                   <th class="timestamp">
@@ -652,15 +805,25 @@ function handleStatusRangeClick(statusRange) {
           <div class="col-span-2 bg-gray-100 p-4 h-[60vh] rounded">
             <h3 class="text-lg font-semibold mb-4">Sequence Diagram Settings</h3>
             <div class="mb-4">
-              <Checkbox bind:checked={showRequestCookies}>Show Request Cookies</Checkbox>
+              <Checkbox bind:checked={addRequestCookies}>Show Request Cookies</Checkbox>
             </div>
             <div class="mb-4">
-              <Checkbox bind:checked={showResponseCookies}>Show Response Cookies</Checkbox>
+              <Checkbox bind:checked={addResponseCookies}>Show Response Cookies</Checkbox>
+            </div>
+            <div class="mb-4">
+              <Checkbox bind:checked={addAutoNumber}>Add Auto-number</Checkbox>
+            </div>
+            <div>
+              <div>
+                <Checkbox bind:checked={addTitle}>Add Title</Checkbox>
+                <Input type="text" id="sequenceTitle" bind:value={sequenceTitle} size="sm"/>
+              </div>
             </div>
           </div>
           <div class="col-span-8 p-4">
             <h3 class="text-lg font-semibold">Mermaid Sequence Preview</h3>
             {@html mermaidSvg}
+            <pre id="testDiv"></pre>
           </div>
           <div class="col-span-2 p-4 h-[60vh] overflow-auto">
             <div class="space-x-1">
@@ -697,7 +860,7 @@ function handleStatusRangeClick(statusRange) {
             <table>
               <thead>
                 <tr>
-                  <th class="path">
+                  <th class="path" rowspan="2">
                     Path
                     {#if filteredEntries.some(entry => entry.path.length > 30)}
                       <button type="button" on:click={togglePathTruncation} aria-label="Toggle path truncation">
@@ -709,7 +872,7 @@ function handleStatusRangeClick(statusRange) {
                       </button>
                     {/if}
                   </th>
-                  <th class="domain">
+                  <th class="domain" rowspan="2">
                     Domain
                     {#if filteredEntries.some(entry => entry.domain.length > 30)}
                       <button type="button" on:click={toggleDomainTruncation} aria-label="Toggle domain truncation">
@@ -721,10 +884,10 @@ function handleStatusRangeClick(statusRange) {
                       </button>
                     {/if}
                   </th>
-                  <th class="type">Type</th>
-                  <th class="status">Status</th>
-                  <th class="method">Method</th>
-                  <th class="timestamp">
+                  <th class="type" rowspan="2">Type</th>
+                  <th class="status" rowspan="2">Status</th>
+                  <th class="method" rowspan="2">Method</th>
+                  <th class="timestamp" rowspan="2">
                     Timestamp
                     {#if filteredEntries.some(entry => entry.timestamp.length > 10)}
                       <button type="button" on:click={toggleTimestampTruncation} aria-label="Toggle timestamp truncation">
@@ -756,12 +919,12 @@ function handleStatusRangeClick(statusRange) {
                   {/each}
                 </tr>
                 <tr>
-                  <th class="path"></th>
+                  <!--<th class="path"></th>
                   <th class="domain"></th>
                   <th class="type"></th>
                   <th class="status"></th>
                   <th class="method"></th>
-                  <th class="timestamp"></th>
+                  <th class="timestamp"></th>-->
                   {#each [...allValueNames] as name}
                     {#if valueNames.has(name)}
                       <th>Request</th>
@@ -852,7 +1015,7 @@ function handleStatusRangeClick(statusRange) {
   }
 
   :global(#domainFilterDiv div[role="listbox"] span){
-    height: 5.5em;
+    height: 4.2em;
     overflow: auto;
   }
 
