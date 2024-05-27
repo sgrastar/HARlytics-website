@@ -29,7 +29,7 @@
   let sequenceTitle =''; 
   let truncatedValues = {};
 
-  let mermaidSvg = '';
+  let marmaidDivElem;
   let plantUMLCode = '';
   let mermaidCode = '';
 
@@ -52,12 +52,17 @@
 
   onMount(() => {
     // initialize
-    //console.log(filteredEntries);
+    console.log('the component has mounted');
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      sequence: {
+        noteAlign: 'left'
+      }
+    });
 
-    mermaid.initialize({ startOnLoad: false });
-    if (filteredEntries.length != 0) {
-      renderMermaidDiagram();
-    }
+    console.log(marmaidDivElem);
+        
   });
 
   function analyzeHAR(event) {
@@ -223,27 +228,24 @@
       name: `${domain} (${domainCounts[domain] || 0})`
     }));
 
+
   $: {
     console.log(filteredEntries);
     if (filteredEntries) {
       mermaidCode = generateMermaidSequence();
       plantUMLCode = generatePlantUMLSequence();
-      if (filteredEntries.length !== 0) {
-        //renderMermaidDiagram();
-      } else {
-        mermaidSvg = '';
-      }
     }
   }
 
+
   $: {
     if (addRequestCookies || addResponseCookies || addAutoNumber || addTitle || sequenceTitle) {
-      console.log("checkbox");
+      //console.log("checkbox");
       if (filteredEntries && filteredEntries.length !== 0) {
-        console.log("checkbox and filter");
+        //console.log("checkbox and filter");
         plantUMLCode = generatePlantUMLSequence();
         mermaidCode = generateMermaidSequence();
-        //renderMermaidDiagram();
+        drawDiagram();
       }
     }
   }
@@ -365,20 +367,35 @@ function handleStatusRangeClick(statusRange) {
   }
 
 
-  const renderMermaidDiagram = async function () {
-    element = document.querySelector('#testDiv');
-    const { svg } = await mermaid.render('testDiv', mermaidCode);
-    element.innerHTML = svg;
-  };
+  /**
+     * @param {unknown} err
+     */
+     function displayErrorInGui(err){
+        //console.log(err);
+    }
 
-/*
-  function renderMermaidDiagram() {
-    console.log("render");
-    mermaid.render('mermaid-diagram', mermaidCode, (svg) => {
-      mermaidSvg = svg;
-    });
-  }
-*/
+    mermaid.parseError = function (err, hash) {
+        displayErrorInGui(err);
+    };
+
+    const textFieldUpdated = async function () {
+        if (await mermaid.parse(mermaidCode)) {
+            //console.log("parse");
+            setTimeout(() => {
+                drawDiagram();
+            }, 300);
+            
+        }
+    };
+
+    const drawDiagram = async function () {
+        //console.log("run drawDiagram");
+        //console.log(marmaidDivElem);
+
+        const { svg } = await mermaid.render('sequenceArea', mermaidCode);
+        marmaidDivElem.innerHTML = svg;
+        
+    };
 
   function generateMermaidSequence() {
     if (!filteredEntries || filteredEntries.length === 0) {
@@ -401,7 +418,7 @@ function handleStatusRangeClick(statusRange) {
 
       if (addRequestCookies && entry.requestCookies.length > 0) {
         const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
-        mermaidCode += `  note over ${entry.domain}: Request Cookies:\\n${cookieString}\n`;
+        mermaidCode += `  note over ${entry.domain}: Request Cookies:<br>${cookieString}\n`;
       }
 
       //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
@@ -417,7 +434,7 @@ function handleStatusRangeClick(statusRange) {
 
       if (addResponseCookies && entry.responseCookies.length > 0) {
         const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
-        mermaidCode += `  note over Browser: Response Cookies:\\n${cookieString}\n`;
+        mermaidCode += `  note over Browser: Response Cookies:<br>${cookieString}\n`;
       }
     });
 
@@ -822,8 +839,9 @@ function formatSpeed(bps) {
           </div>
           <div class="col-span-8 p-4">
             <h3 class="text-lg font-semibold">Mermaid Sequence Preview</h3>
-            {@html mermaidSvg}
-            <pre id="testDiv"></pre>
+            <!--<textarea on:input={textFieldUpdated} bind:value={mermaidCode} rows="10" style="width: 50em;"></textarea>-->
+            <div id="graph" bind:this={marmaidDivElem}></div>
+            
           </div>
           <div class="col-span-2 p-4 h-[60vh] overflow-auto">
             <div class="space-x-1">
@@ -835,7 +853,7 @@ function formatSpeed(bps) {
                 on:click={() => copyTextarea("plantUMLCodeTextarea")}
                 >Copy</Button>
               </div>
-              <Textarea class="mb-4" id="plantUMLCodeTextarea" rows="7" readonly bind:value={plantUMLCode}></Textarea> 
+              <Textarea class="mb-4" id="plantUMLCodeTextarea" rows="7" readonly bind:value={plantUMLCode} on:change={textFieldUpdated}></Textarea> 
             </div>
             <div>
               <h4>Mermaid Sequence Code</h4>
