@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte';
   import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
-  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Accordion, AccordionItem, Textarea, Checkbox } from 'flowbite-svelte';
+  import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
+  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Accordion, AccordionItem, Textarea, Checkbox, ButtonGroup, CheckboxButton } from 'flowbite-svelte';
   import { ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
   import mermaid from 'mermaid';
 
@@ -52,16 +53,18 @@
 
   onMount(() => {
     // initialize
+
     console.log('the component has mounted');
     mermaid.initialize({
       startOnLoad: false,
       theme: 'base',
       sequence: {
         noteAlign: 'left'
-      }
+      },
+      maxTextSize:100000
     });
 
-    console.log(marmaidDivElem);
+    //console.log(marmaidDivElem);
         
   });
 
@@ -83,6 +86,11 @@
         const path = url.pathname;
 
         const setCookieCount = entry.response.headers.filter(header => header.name.toLowerCase() === 'set-cookie').length;
+        const age = entry.response.headers.find(header => header.name.toLowerCase() === 'age')?.value;
+        const ageInSeconds = age ? parseInt(age, 10) : null;
+        const cacheControl = entry.response.headers.find(header => header.name.toLowerCase() === 'cache-control')?.value || '';
+        const parsedCacheControl = parseCacheControl(cacheControl);
+        const isCached = isResponseCached(ageInSeconds, parsedCacheControl);
 
         return {
           url: entry.request.url,
@@ -96,6 +104,9 @@
           responseBodySize: entry.response.bodySize,
           responseTotalSize: ((entry.response.headersSize + entry.response.bodySize) > 0) ? entry.response.headersSize + entry.response.bodySize : 0,
           timestamp: formatTimestamp(new Date(entry.startedDateTime)),
+          age: ageInSeconds,
+          cacheControl: parsedCacheControl,
+          isCached: isCached,
           status: entry.response.status,
           values: entry.request.cookies,
           requestCookies: entry.request.cookies, // リクエストのCookieを追加a
@@ -144,11 +155,35 @@
 
       sequenceTitle = "Sequence: "+logFilename;
 
-      const connectionSpeed = estimateConnectionSpeed(entries);
-      console.log(connectionSpeed);
+      //const connectionSpeed = estimateConnectionSpeed(entries);
+      //console.log(connectionSpeed);
     };
 
     reader.readAsText(file);
+  }
+
+  function parseCacheControl(cacheControlHeader) {
+    const directives = cacheControlHeader.split(',').map(directive => directive.trim());
+    const parsedDirectives = {};
+
+    for (const directive of directives) {
+      const [key, value] = directive.split('=');
+      parsedDirectives[key] = value ? parseInt(value, 10) : true;
+    }
+    return parsedDirectives;
+  }
+
+  function isResponseCached(ageInSeconds, parsedCacheControl) {
+    if (ageInSeconds !== null) {
+      return true;
+    }
+    if (parsedCacheControl['no-cache'] || parsedCacheControl['no-store']) {
+      return false;
+    }
+    if (parsedCacheControl['max-age'] || parsedCacheControl['s-maxage']) {
+      return true;
+    }
+    return false;
   }
 
   function getCommunicationType(entry) {
@@ -189,12 +224,14 @@
   }
   
   $: filteredEntries = entries.filter(entry => {
-    const url = entry.url.toLowerCase();
-    const urlFilters = urlFilter.split('|').map(filter => filter.trim().toLowerCase());
-    const notUrlFilters = notUrlFilter.split('|').map(filter => filter.trim().toLowerCase());
+    //const url = entry.url.toLowerCase();
+    const domain_path = entry.domain + entry.path;
+    const url = domain_path.toLowerCase();
+    const urlFilters = urlFilter.split(',').map(filter => filter.trim().toLowerCase());
+    const notUrlFilters = notUrlFilter.split(',').map(filter => filter.trim().toLowerCase());
 
-    const matchesUrlFilter = (urlFilters[0] && !urlFilter.endsWith('|')) ? urlFilters.some(filter => url.includes(filter)) : true;
-    const matchesNotUrlFilter = (notUrlFilters[0] && !notUrlFilter.endsWith('|')) ? !notUrlFilters.some(filter => url.includes(filter)) : true;
+    const matchesUrlFilter = (urlFilters[0] && !urlFilter.endsWith(',')) ? urlFilters.some(filter => url.includes(filter)) : true;
+    const matchesNotUrlFilter = (notUrlFilters[0] && !notUrlFilter.endsWith(',')) ? !notUrlFilters.some(filter => url.includes(filter)) : true;
     const matchesTypeFilter = selectedTypes.length === 0 || selectedTypes.includes(entry.type);
     const matchesStatusFilter = selectedStatusRanges.some(range =>
       (range.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
@@ -403,7 +440,10 @@ function handleStatusRangeClick(statusRange) {
     }
 
     let mermaidCode = 'sequenceDiagram\n';
-
+    if (addTitle) {
+      //console.log(sequenceTitle);
+      mermaidCode += `title: ${sequenceTitle}\n`;
+    }
     if (addAutoNumber) {
       mermaidCode += "autonumber\n";
     }
@@ -413,7 +453,7 @@ function handleStatusRangeClick(statusRange) {
       const requestArrow = `[${entry.method}] ${truncatedPath}`;
       const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
 
-      mermaidCode += `  Browser->${entry.domain}: ${requestArrow}\n`;
+      mermaidCode += `  Browser->>${entry.domain}: ${requestArrow}\n`;
       mermaidCode += `  activate ${entry.domain}\n`;
 
       if (addRequestCookies && entry.requestCookies.length > 0) {
@@ -423,11 +463,11 @@ function handleStatusRangeClick(statusRange) {
 
       //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
       if( entry.status >= 300 && entry.status <= 399){
-        mermaidCode += `${entry.domain} --> Browser: ${responseArrow}\n`;
+        mermaidCode += `${entry.domain} -->> Browser: ${responseArrow}\n`;
       }else if( entry.status >= 400 && entry.status <= 599){
         mermaidCode += `${entry.domain} --x Browser: ${responseArrow}\n`;
       }else{
-        mermaidCode += `${entry.domain} -> Browser: ${responseArrow}\n`;
+        mermaidCode += `${entry.domain} ->> Browser: ${responseArrow}\n`;
       }
 
       mermaidCode += `  deactivate ${entry.domain}\n`;
@@ -442,17 +482,13 @@ function handleStatusRangeClick(statusRange) {
   }
 
   function generatePlantUMLSequence() {
-    if (!filteredEntries || filteredEntries.length === 0) {
-      console.log("no return");
-      return '';
-    }
 
-    console.log("run plantuml generete");
+    //console.log("run plantuml generete");
 
     let plantUMLCode = '@startuml\n';
 
     if (addTitle) {
-      console.log(sequenceTitle);
+      //console.log(sequenceTitle);
       plantUMLCode += `title: ${sequenceTitle}\n`;
     }
     if (addAutoNumber) {
@@ -494,99 +530,6 @@ function handleStatusRangeClick(statusRange) {
     return plantUMLCode;
   }
 
-
-function estimateConnectionSpeed(entries) {
-  const validEntries = entries.filter(entry => {
-    return entry.status >= 200 && entry.status < 300;
-  });
-
-  const upSpeeds = validEntries
-    .filter(entry => entry.requestBodySize > 0 && entry.timings.send > 0)
-    .map(entry => {
-      const bodySize = entry.requestBodySize;
-      const time = entry.timings.send / 1000;
-      const speed = bodySize * 8 / time;
-      return { speed, url: removeQueryString(entry.url) };
-    });
-
-  const downSpeeds = validEntries
-    .filter(entry => entry.responseBodySize > 0 && entry.timings.receive > 0)
-    .map(entry => {
-      const bodySize = entry.responseBodySize;
-      const time = entry.timings.receive / 1000;
-      const speed = bodySize * 8 / time;
-      return { speed, url: removeQueryString(entry.url) };
-    });
-
-  const trimmedUpSpeeds = trimOutliers(upSpeeds.map(item => item.speed));
-  const trimmedDownSpeeds = trimOutliers(downSpeeds.map(item => item.speed));
-
-  const uploadData = upSpeeds.length > 0 ? {
-    maxSpeed: formatSpeed(Math.max(...upSpeeds.map(item => item.speed))),
-    maxSpeedUrl: upSpeeds.find(item => item.speed === Math.max(...upSpeeds.map(item => item.speed))).url,
-    minSpeed: formatSpeed(Math.min(...upSpeeds.map(item => item.speed))),
-    minSpeedUrl: upSpeeds.find(item => item.speed === Math.min(...upSpeeds.map(item => item.speed))).url,
-    avgSpeed: formatSpeed(getAverage(trimmedUpSpeeds)),
-    medianSpeed: formatSpeed(getMedian(trimmedUpSpeeds)),
-    trimmedAvgSpeed: formatSpeed(getAverage(trimmedUpSpeeds)),
-    trimmedMedianSpeed: formatSpeed(getMedian(trimmedUpSpeeds))
-  } : {};
-
-  const downloadData = downSpeeds.length > 0 ? {
-    maxSpeed: formatSpeed(Math.max(...downSpeeds.map(item => item.speed))),
-    maxSpeedUrl: downSpeeds.find(item => item.speed === Math.max(...downSpeeds.map(item => item.speed))).url,
-    minSpeed: formatSpeed(Math.min(...downSpeeds.map(item => item.speed))),
-    minSpeedUrl: downSpeeds.find(item => item.speed === Math.min(...downSpeeds.map(item => item.speed))).url,
-    avgSpeed: formatSpeed(getAverage(trimmedDownSpeeds)),
-    medianSpeed: formatSpeed(getMedian(trimmedDownSpeeds)),
-    trimmedAvgSpeed: formatSpeed(getAverage(trimmedDownSpeeds)),
-    trimmedMedianSpeed: formatSpeed(getMedian(trimmedDownSpeeds))
-  } : {};
-
-  return {
-    upload: uploadData,
-    download: downloadData
-  };
-}
-
-function removeQueryString(url) {
-  return url.split('?')[0];
-}
-
-function trimOutliers(data, threshold = 0.1) {
-  const sortedData = [...data].sort((a, b) => a - b);
-  const n = sortedData.length;
-  const lowIndex = Math.floor(n * threshold);
-  const highIndex = Math.ceil(n * (1 - threshold)) - 1;
-  return sortedData.slice(lowIndex, highIndex + 1);
-}
-
-function getAverage(arr) {
-  if (arr.length === 0) {
-    return 0;
-  }
-  const sum = arr.reduce((acc, val) => acc + val, 0);
-  return sum / arr.length;
-}
-
-function getMedian(arr) {
-  if (arr.length === 0) {
-    return 0;
-  }
-  const sorted = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-function formatSpeed(bps) {
-  if (bps < 1000) {
-    return `${bps.toFixed(2)} bps`;
-  } else if (bps < 1000000) {
-    return `${(bps / 1000).toFixed(2)} Kbps`;
-  } else {
-    return `${(bps / 1000000).toFixed(2)} Mbps`;
-  }
-}
 
 </script>
 <main class="p-4">
@@ -653,19 +596,21 @@ function formatSpeed(bps) {
         </div>
     
         <div class="col-span-8 flex space-x-1">
-          {#each statusRanges as statusRange}
-            <Button
-              size="xs"
-              class="px-2 py-0.5 font-light {selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}"
-              color={selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}
-              on:click={() => handleStatusRangeClick(statusRange)}
-            >
-              {statusRange.label} ({filteredEntries.filter(entry =>
-                (statusRange.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
-                (entry.status >= statusRange.min && entry.status <= statusRange.max)
-              ).length}/{statusCounts[statusRange.label] || 0})
-            </Button>
-          {/each}
+          <ButtonGroup>
+            {#each statusRanges as statusRange}
+              <CheckboxButton
+                size="xs"
+                class="px-2 py-0.5 font-light {selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}"
+                color={selectedStatusRanges.includes(statusRange) ? 'dark' : 'light'}
+                on:click={() => handleStatusRangeClick(statusRange)}
+              >
+                {statusRange.label} ({filteredEntries.filter(entry =>
+                  (statusRange.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
+                  (entry.status >= statusRange.min && entry.status <= statusRange.max)
+                ).length}/{statusCounts[statusRange.label] || 0})
+              </CheckboxButton>
+            {/each}
+          </ButtonGroup>
         </div>
       </div>
   
@@ -681,16 +626,18 @@ function formatSpeed(bps) {
         </div>
 
         <div class="col-span-10 flex space-x-1" >
-          {#each communicationTypes as type}
-            <Button
-              size="xs"
-              class="px-2 py-0.5 font-light"
-              color={selectedTypes.includes(type) ? 'dark' : 'light'}
-              on:click={() => handleTypeClick(type)}
-            >
-              {type} ({filteredEntries.filter(entry => entry.type === type).length}/{typeCounts[type] || 0})
-            </Button>
-          {/each}
+          <ButtonGroup>
+            {#each communicationTypes as type}
+              <CheckboxButton
+                size="xs"
+                class="px-2 py-0.5 font-light"
+                color={selectedTypes.includes(type) ? 'dark' : 'light'}
+                on:click={() => handleTypeClick(type)}
+              >
+                {type} ({filteredEntries.filter(entry => entry.type === type).length}/{typeCounts[type] || 0})
+              </CheckboxButton>
+            {/each}
+        </ButtonGroup>
         </div>
       </div>
     </div>
@@ -701,7 +648,9 @@ function formatSpeed(bps) {
         <div slot="title" class="flex items-center gap-2">
           <ChartPieSolid size="sm" />Overview
         </div>
-        <div id="analyzeOverviewDisplay"></div>
+        <div id="analyzeOverviewDisplay">
+          <div id="buildTimestamp">2024-05-28 22:12:13</div>
+        </div>
       </TabItem>
       <TabItem open>
         <div slot="title" class="flex items-center gap-2">
@@ -757,6 +706,8 @@ function formatSpeed(bps) {
                 <th>Set Cookies</th>
                 <th>Time</th>
                 <th>Size</th>
+                <th>isCached</th>
+                <th>age</th>
                 <th>dns</th>
                 <th>connect</th>
                 <th>ssl</th>
@@ -770,7 +721,7 @@ function formatSpeed(bps) {
                 <tr>
                   <th class="path">
                     {#if entry.path.length > 50}
-                      <span title={entry.domain}{entry.path}>{isPathTruncated ? truncateText(entry.path, 50) : entry.path}</span>
+                      <span title={entry.url}>{isPathTruncated ? truncateText(entry.path, 50) : entry.path}</span>
                     {:else}
                       {entry.path}
                     {/if}
@@ -796,6 +747,8 @@ function formatSpeed(bps) {
                   <td class="setCookies">{entry.setCookieCount}</td>
                   <td class="time">{formatTime(entry.time)}</td>
                   <td class="size">{formatBytes(entry.responseTotalSize)}</td>
+                  <td class="isCached">{entry.isCached}</td>
+                  <td class="age">{entry.age !== null ? entry.age : ''}</td>
                   <td class="dns">{entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : ''}</td>
                   <td class="connect">{entry.timings.connect >= 0 ? formatTime(entry.timings.connect) : ''}</td>
                   <td class="ssl">{entry.timings.ssl >= 0 ? formatTime(entry.timings.ssl) : ''}</td>
@@ -819,51 +772,61 @@ function formatSpeed(bps) {
           <DrawSquareOutline size="sm" />Sequence
         </div>
         <div id="analyzeSequenceDisplay" class="grid grid-cols-12">
-          <div class="col-span-2 bg-gray-100 p-4 h-[60vh] rounded">
+          <div class="col-span-2 bg-gray-100 p-4 rounded">
             <h3 class="text-lg font-semibold mb-4">Sequence Diagram Settings</h3>
+            <h4 class="text-base mb-2">General Settings</h4>
+            <div class="mb-4">
+              <Checkbox bind:checked={addAutoNumber}>Add Auto-number</Checkbox>
+            </div>
+            <div class="mb-4">
+              <div>
+                <Checkbox bind:checked={addTitle} class="mb-2">Add Title</Checkbox>
+                <Input type="text" id="sequenceTitle" bind:value={sequenceTitle} size="sm"/>
+              </div>
+            </div>
+            <h4 class="text-base mb-2">Notes Settings</h4>
             <div class="mb-4">
               <Checkbox bind:checked={addRequestCookies}>Show Request Cookies</Checkbox>
             </div>
             <div class="mb-4">
               <Checkbox bind:checked={addResponseCookies}>Show Response Cookies</Checkbox>
             </div>
-            <div class="mb-4">
-              <Checkbox bind:checked={addAutoNumber}>Add Auto-number</Checkbox>
-            </div>
-            <div>
-              <div>
-                <Checkbox bind:checked={addTitle}>Add Title</Checkbox>
-                <Input type="text" id="sequenceTitle" bind:value={sequenceTitle} size="sm"/>
-              </div>
-            </div>
           </div>
           <div class="col-span-8 p-4">
-            <h3 class="text-lg font-semibold">Mermaid Sequence Preview</h3>
+            <h3 class="text-lg font-semibold">Sequence Preview (Mermaid)</h3>
             <!--<textarea on:input={textFieldUpdated} bind:value={mermaidCode} rows="10" style="width: 50em;"></textarea>-->
             <div id="graph" bind:this={marmaidDivElem}></div>
             
           </div>
-          <div class="col-span-2 p-4 h-[60vh] overflow-auto">
-            <div class="space-x-1">
-              <div>
-                <h4>PlantUML Sequence Code</h4>
+          <div class="col-span-2 bg-gray-100 p-4 rounded" >
+            <h3 class="text-lg font-semibold mb-4">Export...</h3>
+            
+            <div class="mb-2">
+              <div class="mb-2 flex justify-between">
+                <h4 class="text-base">Mermaid Diagram</h4>
+                <Button
+                size="xs"
+                class="px-2 py-0.5 font-light"
+                on:click={() => copyTextarea("mermaidCodeTextarea")}
+                >Copy</Button>
+              </div>
+              
+              <Textarea rows="5" id="mermaidCodeTextarea" readonly bind:value={mermaidCode}></Textarea>
+            </div>
+
+            <div class="mb-2">
+              <div class="mb-2 flex justify-between">
+                <h4 class="text-base">PlantUML Diagram</h4>
                 <Button
                 size="xs"
                 class="px-2 py-0.5 font-light"
                 on:click={() => copyTextarea("plantUMLCodeTextarea")}
                 >Copy</Button>
               </div>
-              <Textarea class="mb-4" id="plantUMLCodeTextarea" rows="7" readonly bind:value={plantUMLCode} on:change={textFieldUpdated}></Textarea> 
+
+              <Textarea id="plantUMLCodeTextarea" rows="5" readonly bind:value={plantUMLCode} on:change={textFieldUpdated}></Textarea> 
             </div>
-            <div>
-              <h4>Mermaid Sequence Code</h4>
-              <Button
-              size="xs"
-              class="px-2 py-0.5 font-light"
-              on:click={() => copyTextarea("mermaidCodeTextarea")}
-              >Copy</Button>
-              <Textarea rows="7" id="mermaidCodeTextarea" readonly bind:value={mermaidCode}></Textarea>
-            </div>
+            
           </div>
         </div>
       </TabItem>
@@ -956,7 +919,7 @@ function formatSpeed(bps) {
                   <tr>
                     <th class="path">
                       {#if entry.path.length > 30}
-                        <span title={entry.domain}{entry.path}>{isPathTruncated ? truncateText(entry.path, 30) : entry.path}</span>
+                        <span title={entry.url}>{isPathTruncated ? truncateText(entry.path, 30) : entry.path}</span>
                       {:else}
                         {entry.path}
                       {/if}

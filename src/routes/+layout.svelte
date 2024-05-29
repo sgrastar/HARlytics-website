@@ -1,10 +1,23 @@
 <script>
     import "../app.css";
+    import { onMount } from 'svelte';
+    import { Badge } from 'flowbite-svelte';
+  
+    let isLive = false;
+
+    onMount(() => {
+      if (typeof window !== 'undefined') {
+        isLive = window.location.protocol !== 'chrome-extension:';
+      }
+    });
   </script>
   
   <header class="text-white body-font bg-gray-600">
     <div class=" mx-auto flex flex-wrap px-4 py-1 flex-col md:flex-row items-center">
         <span class="">HAR Analyzer</span>
+        {#if isLive}
+          <Badge large color="indigo" class="ml-4">Cloud Edition</Badge>
+        {/if}
       <!--
         <nav class="md:ml-auto flex flex-wrap items-center text-base justify-center">
         <a class="mr-5 hover:text-gray-900">First Link</a>
