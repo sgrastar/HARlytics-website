@@ -560,11 +560,11 @@ function handleStatusRangeClick(statusRange) {
         <div class="grid grid-cols-12">
 
           <div class="col-span-6">
-            <Label for="urlFilter">Filter by URL (separate by |):</Label>
+            <Label for="urlFilter">Filter by URL (separate by commas):</Label>
             <Input type="text" id="urlFilter" bind:value={urlFilter} on:input={handleFilterInput}  size="sm"/>
           </div>
           <div class="col-span-6 ml-2">
-            <Label for="notUrlFilter">Exclude URLs containing (separate by |):</Label>
+            <Label for="notUrlFilter">Exclude URLs containing (separate by commas):</Label>
             <Input type="text" id="notUrlFilter" bind:value={notUrlFilter} on:input={handleFilterInput}  size="sm"/>
           </div>
 
@@ -649,7 +649,7 @@ function handleStatusRangeClick(statusRange) {
           <ChartPieSolid size="sm" />Overview
         </div>
         <div id="analyzeOverviewDisplay">
-          <div id="buildTimestamp">Build ver.20240530182915</div>
+          <div id="buildTimestamp">Build ver.20240530183909</div>
         </div>
       </TabItem>
       <TabItem open>
@@ -984,7 +984,7 @@ function handleStatusRangeClick(statusRange) {
 </div>
 </main>
 <style>
-  body{
+  :global(body){
     font-size: 100%;
   }
   main{

@@ -1,5 +1,7 @@
 # HAR Analyzer
 
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsgrastar%2Fhar-analyzer.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsgrastar%2Fhar-analyzer?ref=badge_shield&issueType=license)
+
 This is a tool to help analyze HAR (HTTP Archive File) files. This tool helps with things like analyzing the network and browser cookies being communicated with.
 
 - Analysis of browser cookies
