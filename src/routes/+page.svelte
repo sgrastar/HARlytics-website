@@ -649,7 +649,7 @@ function handleStatusRangeClick(statusRange) {
           <ChartPieSolid size="sm" />Overview
         </div>
         <div id="analyzeOverviewDisplay">
-          <div id="buildTimestamp">2024-05-28 22:12:13</div>
+          <div id="buildTimestamp">Build ver.20240530182915</div>
         </div>
       </TabItem>
       <TabItem open>
@@ -984,6 +984,9 @@ function handleStatusRangeClick(statusRange) {
 </div>
 </main>
 <style>
+  body{
+    font-size: 100%;
+  }
   main{
     font-size: 80%;
   }
