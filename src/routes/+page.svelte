@@ -9,6 +9,7 @@
   let logFilename = '';
   let logVersion = '';
   let logCreator = '';
+  let pages = [];
   let entries = [];
   let urlFilter = '';
   let notUrlFilter = '';
@@ -23,8 +24,11 @@
   let isPathTruncated = true;
   let isDomainTruncated = true;
   let isTimestampTruncated = true;
-  let addRequestCookies = true;
-  let addResponseCookies = true;
+  let addLifeline = true;
+  let addRequestCookies = false;
+  let addRequestQueryString = false;
+  let addRequestPostData = false;
+  let addResponseCookies = false;
   let addAutoNumber = false;
   let addTitle = true;
   let sequenceTitle =''; 
@@ -75,9 +79,12 @@
 
     reader.onload = function (e) {
       const harContent = JSON.parse(e.target.result);
+      pages = harContent.log.pages;
       entries = harContent.log.entries;
       logVersion = harContent.log.version;
       logCreator = harContent.log.creator.name + "(" +  harContent.log.creator.version +  ")";
+
+      console.log(pages);
       
 
       entries = entries.map(entry => {
@@ -85,6 +92,7 @@
         const domain = url.hostname;
         const path = url.pathname;
 
+        const requestPostData = parsePostData(entry.request.postData);
         const setCookieCount = entry.response.headers.filter(header => header.name.toLowerCase() === 'set-cookie').length;
         const age = entry.response.headers.find(header => header.name.toLowerCase() === 'age')?.value;
         const ageInSeconds = age ? parseInt(age, 10) : null;
@@ -99,6 +107,7 @@
           path: path,
           time: entry.time,
           timings: entry.timings,
+          requestPostData: requestPostData,
           requestBodySize: entry.request.bodySize,
           responseHeaderSize: entry.response.headersSize,
           responseBodySize: entry.response.bodySize,
@@ -109,6 +118,7 @@
           isCached: isCached,
           status: entry.response.status,
           values: entry.request.cookies,
+          requestQueryString: entry.request.queryString,
           requestCookies: entry.request.cookies, // リクエストのCookieを追加a
           responseCookies: entry.response.cookies, // レスポンスのCookieを追加
           setCookieCount: setCookieCount,
@@ -160,6 +170,54 @@
     };
 
     reader.readAsText(file);
+  }
+
+  function parsePostData(postData) {
+    if (!postData) {
+      return null;
+    }
+
+    let requestPostData = null;
+    if (postData.mimeType === 'application/x-www-form-urlencoded') {
+      requestPostData = {
+        mimeType: postData.mimeType,
+        text: decodeURIComponent(postData.text),
+        params: postData.params.map(param => ({
+          name: decodeURIComponent(param.name),
+          value: decodeURIComponent(param.value)
+        }))
+      };
+    } else if (postData.mimeType === 'text/plain') {
+      requestPostData = {
+        mimeType: postData.mimeType,
+        text: decodeURIComponent(postData.text)
+      };
+    } else if (postData.mimeType === 'application/json') {
+      try {
+        const decodedText = decodeURIComponent(postData.text);
+        const jsonData = JSON.parse(decodedText);
+        requestPostData = {
+          mimeType: postData.mimeType,
+          text: decodedText,
+          params: Object.entries(jsonData).map(([name, value]) => ({
+            name: decodeURIComponent(name),
+            value: decodeURIComponent(value.toString())
+          }))
+        };
+      } catch (error) {
+        requestPostData = {
+          mimeType: postData.mimeType,
+          text: decodeURIComponent(postData.text)
+        };
+      }
+    } else {
+      requestPostData = {
+        mimeType: postData.mimeType,
+        text: decodeURIComponent(postData.text)
+      };
+    }
+
+    return requestPostData;
   }
 
   function parseCacheControl(cacheControlHeader) {
@@ -276,7 +334,7 @@
 
 
   $: {
-    if (addRequestCookies || addResponseCookies || addAutoNumber || addTitle || sequenceTitle) {
+    if (addRequestCookies || addResponseCookies || addAutoNumber || addTitle || addLifeline || sequenceTitle || addRequestQueryString || addRequestPostData) {
       //console.log("checkbox");
       if (filteredEntries && filteredEntries.length !== 0) {
         //console.log("checkbox and filter");
@@ -426,64 +484,78 @@ function handleStatusRangeClick(statusRange) {
     };
 
     const drawDiagram = async function () {
-        //console.log("run drawDiagram");
-        //console.log(marmaidDivElem);
-
+      //console.log("run drawDiagram");
+      //console.log(marmaidDivElem);
+      if(marmaidDivElem){
         const { svg } = await mermaid.render('sequenceArea', mermaidCode);
         marmaidDivElem.innerHTML = svg;
-        
+      }
     };
 
-  function generateMermaidSequence() {
-    if (!filteredEntries || filteredEntries.length === 0) {
-      return '';
-    }
-
-    let mermaidCode = 'sequenceDiagram\n';
-    if (addTitle) {
-      //console.log(sequenceTitle);
-      mermaidCode += `title: ${sequenceTitle}\n`;
-    }
-    if (addAutoNumber) {
-      mermaidCode += "autonumber\n";
-    }
-
-    filteredEntries.forEach(entry => {
-      const truncatedPath = truncateText(entry.path, 70);
-      const requestArrow = `[${entry.method}] ${truncatedPath}`;
-      const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
-
-      mermaidCode += `  Browser->>${entry.domain}: ${requestArrow}\n`;
-      mermaidCode += `  activate ${entry.domain}\n`;
-
-      if (addRequestCookies && entry.requestCookies.length > 0) {
-        const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
-        mermaidCode += `  note over ${entry.domain}: Request Cookies:<br>${cookieString}\n`;
+    function generateMermaidSequence() {
+      if (!filteredEntries || filteredEntries.length === 0) {
+        return '';
       }
 
-      //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
-      if( entry.status >= 300 && entry.status <= 399){
-        mermaidCode += `${entry.domain} -->> Browser: ${responseArrow}\n`;
-      }else if( entry.status >= 400 && entry.status <= 599){
-        mermaidCode += `${entry.domain} --x Browser: ${responseArrow}\n`;
-      }else{
-        mermaidCode += `${entry.domain} ->> Browser: ${responseArrow}\n`;
+      let mermaidCode = 'sequenceDiagram\n';
+      if (addTitle) {
+        //console.log(sequenceTitle);
+        mermaidCode += `title: ${sequenceTitle}\n`;
+      }
+      if (addAutoNumber) {
+        mermaidCode += "autonumber\n";
       }
 
-      mermaidCode += `  deactivate ${entry.domain}\n`;
+      filteredEntries.forEach(entry => {
+        const truncatedPath = truncateText(entry.path, 70);
+        const requestArrow = `[${entry.method}] ${truncatedPath}`;
+        const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
 
-      if (addResponseCookies && entry.responseCookies.length > 0) {
-        const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('<br>');
-        mermaidCode += `  note over Browser: Response Cookies:<br>${cookieString}\n`;
-      }
-    });
+        mermaidCode += `  Browser->>${entry.domain}: ${requestArrow}\n`;
+        if(addLifeline){
+          mermaidCode += `  activate ${entry.domain}\n`;
+        }
+        
+        if (addRequestQueryString && entry.requestQueryString.length > 0) {
+          const requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, 25)}: ${truncateText(Qstring.value, 25)}`).join('<br>');
+          mermaidCode += `  note over ${entry.domain}: [Query String]<br>${requestQueryStringString}\n`;
+        }
 
-    return mermaidCode;
-  }
+        if (addRequestPostData && entry.requestPostData) {
+          const postDataString = entry.requestPostData.params
+            ? entry.requestPostData.params.map(param => `${truncateText(param.name, 25)}: ${truncateText(param.value, 25)}`).join('<br>')
+            : truncateText(entry.requestPostData.text, 50);
+          mermaidCode += `note over ${entry.domain}: [postData] ${entry.requestPostData.mimeType}<br>${postDataString}\n`;
+        }
+
+        if (addRequestCookies && entry.requestCookies.length > 0) {
+          const cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name, 25)}: ${truncateText(cookie.value, 25)}`).join('<br>');
+          mermaidCode += `  note over ${entry.domain}: [Request Cookies]<br>${cookieString}\n`;
+        }
+
+        //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
+        if( entry.status >= 300 && entry.status <= 399){
+          mermaidCode += `${entry.domain} -->> Browser: ${responseArrow}\n`;
+        }else if( entry.status >= 400 && entry.status <= 599){
+          mermaidCode += `${entry.domain} --x Browser: ${responseArrow}\n`;
+        }else{
+          mermaidCode += `${entry.domain} ->> Browser: ${responseArrow}\n`;
+        }
+
+        if(addLifeline){
+          mermaidCode += `  deactivate ${entry.domain}\n`;
+        }
+
+        if (addResponseCookies && entry.responseCookies.length > 0) {
+          const cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, 25)}: ${truncateText(cookie.value, 25)}`).join('<br>');
+          mermaidCode += `  note over Browser: [Response Cookies]<br>${cookieString}\n`;
+        }
+      });
+
+      return mermaidCode;
+    }
 
   function generatePlantUMLSequence() {
-
-    //console.log("run plantuml generete");
 
     let plantUMLCode = '@startuml\n';
 
@@ -497,15 +569,30 @@ function handleStatusRangeClick(statusRange) {
 
     filteredEntries.forEach(entry => {
       const truncatedPath = truncateText(entry.path, 70);
-      const requestArrow = `${entry.method} ${truncatedPath}`;
+      const requestArrow = `[${entry.method}] ${truncatedPath}`;
       const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
 
       plantUMLCode += `Browser -> "${entry.domain}": ${requestArrow}\n`;
-      plantUMLCode += `activate "${entry.domain}"\n`;
+
+      if(addLifeline){
+        plantUMLCode += `activate "${entry.domain}"\n`;
+      }
+
+      if (addRequestQueryString && entry.requestQueryString.length > 0) {
+        const requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, 25)}: ${truncateText(Qstring.value, 25)}`).join('\\n');
+        plantUMLCode += `  note over "${entry.domain}": **[Query String]**\\n${requestQueryStringString}\n`;
+      }
+
+      if (addRequestPostData && entry.requestPostData) {
+        const postDataString = entry.requestPostData.params
+          ? entry.requestPostData.params.map(param => `${truncateText(param.name, 25)}: ${truncateText(param.value, 25)}`).join('\\n')
+          : truncateText(entry.requestPostData.text, 50);
+          plantUMLCode += `note over "${entry.domain}": **[postData]** ${entry.requestPostData.mimeType}\\n${postDataString}\n`;
+      }
 
       if (addRequestCookies && entry.requestCookies.length > 0) {
-        const cookieString = entry.requestCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('\\n');
-        plantUMLCode += `note over "${entry.domain}": **Request Cookies**:\\n${cookieString}\n`;
+        const cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name,25)}: ${truncateText(cookie.value, 25)}`).join('\\n');
+        plantUMLCode += `note over "${entry.domain}": **[Request Cookies]**\\n${cookieString}\n`;
       }
 
       if( entry.status >= 300 && entry.status <= 399){
@@ -519,11 +606,14 @@ function handleStatusRangeClick(statusRange) {
       //plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
 
       if (addResponseCookies && entry.responseCookies.length > 0) {
-        const cookieString = entry.responseCookies.map(cookie => `${cookie.name}: ${truncateText(cookie.value, 15)}`).join('\\n');
-        plantUMLCode += `note over Browser: **Response Cookies**:\\n${cookieString}\n`;
+        const cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, 25)}: ${truncateText(cookie.value, 25)}`).join('\\n');
+        plantUMLCode += `note over Browser: **[Response Cookies]**\\n${cookieString}\n`;
       }
 
-      plantUMLCode += `deactivate "${entry.domain}"\n`;
+      if(addLifeline){
+        plantUMLCode += `deactivate "${entry.domain}"\n`;
+      }
+      
     });
 
     plantUMLCode += '@enduml';
@@ -784,7 +874,18 @@ function handleStatusRangeClick(statusRange) {
                 <Input type="text" id="sequenceTitle" bind:value={sequenceTitle} size="sm"/>
               </div>
             </div>
+            <div class="mb-4">
+              <Checkbox bind:checked={addLifeline} class="mb-2">Add Lifeline Activation and Destruction</Checkbox>
+            </div>
+            
             <h4 class="text-base mb-2">Notes Settings</h4>
+            
+            <div class="mb-4">
+              <Checkbox bind:checked={addRequestQueryString}>Show queryString</Checkbox>
+            </div>
+            <div class="mb-4">
+              <Checkbox bind:checked={addRequestPostData}>Show postData</Checkbox>
+            </div>
             <div class="mb-4">
               <Checkbox bind:checked={addRequestCookies}>Show Request Cookies</Checkbox>
             </div>
