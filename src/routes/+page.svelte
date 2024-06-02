@@ -2,8 +2,8 @@
   import { onMount } from 'svelte';
   import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
-  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Accordion, AccordionItem, Textarea, Checkbox, ButtonGroup, CheckboxButton } from 'flowbite-svelte';
-  import { ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
+  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
+  import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
   import mermaid from 'mermaid';
 
   let logFilename = '';
@@ -177,27 +177,29 @@
       return null;
     }
 
+    const mimeType = postData.mimeType ? postData.mimeType.split(';')[0].trim() : '';
+
     let requestPostData = null;
-    if (postData.mimeType === 'application/x-www-form-urlencoded') {
+    if (mimeType === 'application/x-www-form-urlencoded') {
       requestPostData = {
-        mimeType: postData.mimeType,
+        mimeType: mimeType,
         text: decodeURIComponent(postData.text),
         params: postData.params.map(param => ({
           name: decodeURIComponent(param.name),
           value: decodeURIComponent(param.value)
         }))
       };
-    } else if (postData.mimeType === 'text/plain') {
+    } else if (mimeType === 'text/plain') {
       requestPostData = {
-        mimeType: postData.mimeType,
+        mimeType: mimeType,
         text: decodeURIComponent(postData.text)
       };
-    } else if (postData.mimeType === 'application/json') {
+    } else if (mimeType === 'application/json') {
       try {
         const decodedText = decodeURIComponent(postData.text);
         const jsonData = JSON.parse(decodedText);
         requestPostData = {
-          mimeType: postData.mimeType,
+          mimeType: mimeType,
           text: decodedText,
           params: Object.entries(jsonData).map(([name, value]) => ({
             name: decodeURIComponent(name),
@@ -206,13 +208,13 @@
         };
       } catch (error) {
         requestPostData = {
-          mimeType: postData.mimeType,
+          mimeType: mimeType,
           text: decodeURIComponent(postData.text)
         };
       }
     } else {
       requestPostData = {
-        mimeType: postData.mimeType,
+        mimeType: mimeType,
         text: decodeURIComponent(postData.text)
       };
     }
@@ -282,23 +284,26 @@
   }
   
   $: filteredEntries = entries.filter(entry => {
-    //const url = entry.url.toLowerCase();
-    const domain_path = entry.domain + entry.path;
-    const url = domain_path.toLowerCase();
-    const urlFilters = urlFilter.split(',').map(filter => filter.trim().toLowerCase());
-    const notUrlFilters = notUrlFilter.split(',').map(filter => filter.trim().toLowerCase());
+      const domain_path = entry.domain + entry.path;
+      const url = domain_path.toLowerCase();
+      const urlFilters = urlFilter.split(',').map(filter => filter.trim().toLowerCase());
 
-    const matchesUrlFilter = (urlFilters[0] && !urlFilter.endsWith(',')) ? urlFilters.some(filter => url.includes(filter)) : true;
-    const matchesNotUrlFilter = (notUrlFilters[0] && !notUrlFilter.endsWith(',')) ? !notUrlFilters.some(filter => url.includes(filter)) : true;
-    const matchesTypeFilter = selectedTypes.length === 0 || selectedTypes.includes(entry.type);
-    const matchesStatusFilter = selectedStatusRanges.some(range =>
-      (range.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
-      (entry.status >= range.min && entry.status <= range.max)
-    );
-    const matchesDomainFilter = selectedDomains.length === 0 || selectedDomains.includes(entry.domain);
+      const matchesUrlFilter = urlFilters.every(filter => {
+          if (filter.startsWith('-')) {
+              return !url.includes(filter.slice(1));
+          } else {
+              return filter === '' || url.includes(filter);
+          }
+      });
 
-    return matchesUrlFilter && matchesNotUrlFilter && matchesTypeFilter && matchesStatusFilter && matchesDomainFilter;
-    
+      const matchesTypeFilter = selectedTypes.length === 0 || selectedTypes.includes(entry.type);
+      const matchesStatusFilter = selectedStatusRanges.some(range =>
+        (range.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
+        (entry.status >= range.min && entry.status <= range.max)
+      );
+      const matchesDomainFilter = selectedDomains.length === 0 || selectedDomains.includes(entry.domain);
+
+      return matchesUrlFilter && matchesTypeFilter && matchesStatusFilter && matchesDomainFilter;
   });
 
   //$: allValueNames = new Set(entries.flatMap(entry => entry.values.map(value => value.name)));
@@ -647,15 +652,67 @@ function handleStatusRangeClick(statusRange) {
           </div>
         </div>
 
-        <div class="grid grid-cols-12">
+        <div class="grid grid-cols-12 flex items-end">
 
           <div class="col-span-6">
-            <Label for="urlFilter">Filter by URL (separate by commas):</Label>
-            <Input type="text" id="urlFilter" bind:value={urlFilter} on:input={handleFilterInput}  size="sm"/>
+            <Label for="urlFilter">URL Filters (any match):</Label>
+            <Search type="text" id="urlFilter" bind:value={urlFilter} on:input={handleFilterInput} placeholder="comma-separated, use '-' to exclude" size="sm"/>
           </div>
+          <!--
           <div class="col-span-6 ml-2">
             <Label for="notUrlFilter">Exclude URLs containing (separate by commas):</Label>
             <Input type="text" id="notUrlFilter" bind:value={notUrlFilter} on:input={handleFilterInput}  size="sm"/>
+          </div>-->
+
+          <div class="col-span-3 ml-2">
+            <Button size="sm" class="w-full">
+              HTTP Status Filter
+              <ChevronDownOutline class="w-3 h-3 ml-2 text-white dark:text-white" />
+            </Button>
+            
+            <Dropdown class="w-44 p-3 space-y-3 text-sm">
+              <div slot="header" class="px-4 py-2">
+                <div class="flex items-center">
+                  <Toggle class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
+                  size="small" bind:checked={allStatusSelected} on:change={handleAllStatusChange}>All</Toggle>
+                </div>
+              </div>
+              <DropdownDivider />
+              {#each statusRanges as statusRange}
+                <li class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
+                  <Checkbox checked={selectedStatusRanges.includes(statusRange)} on:click={() => handleStatusRangeClick(statusRange)}>
+                    {statusRange.label} ({filteredEntries.filter(entry =>
+                      (statusRange.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
+                      (entry.status >= statusRange.min && entry.status <= statusRange.max)
+                    ).length}/{statusCounts[statusRange.label] || 0})
+                  </Checkbox>
+                </li>
+              {/each}
+            </Dropdown>
+          </div>
+          
+          <div class="col-span-3 ml-2">
+            <Button size="sm" class="w-full">
+              mimeType Filter
+              <ChevronDownOutline class="w-3 h-3 ml-2 text-white dark:text-white" />
+            </Button>
+            
+            <Dropdown class="w-44 p-3 space-y-3 text-sm">
+              <div slot="header" class="px-4 py-2">
+                <div class="flex items-center">
+                  <Toggle  class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
+                   size="small" bind:checked={allSelected} on:change={handleAllChange}>All</Toggle>
+                </div>
+              </div>
+              
+              {#each communicationTypes as type}
+                <li class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
+                  <Checkbox checked={selectedTypes.includes(type)} on:click={() => handleTypeClick(type)}>
+                    {type} ({filteredEntries.filter(entry => entry.type === type).length}/{typeCounts[type] || 0})
+                  </Checkbox>
+                </li>
+              {/each}
+            </Dropdown>
           </div>
 
           
@@ -669,7 +726,7 @@ function handleStatusRangeClick(statusRange) {
       </div>
     </div>
     
-
+  <!--
     <div id="filters" class="grid grid-cols-12 flex items-center space-x-1">
 
       <div id="filterStatus" class="col-span-4 grid grid-cols-12 gap-4 p-2 flex items-center bg-gray-100 rounded">
@@ -731,7 +788,11 @@ function handleStatusRangeClick(statusRange) {
         </div>
       </div>
     </div>
+  -->
+
   </div>
+
+
   <div id="display">
     <Tabs tabStyle="underline">
       <TabItem >
@@ -741,6 +802,117 @@ function handleStatusRangeClick(statusRange) {
         <div id="analyzeOverviewDisplay">
           <div id="buildTimestamp">Build ver.20240530183909</div>
         </div>
+      </TabItem>
+      <TabItem open>
+        <div slot="title" class="flex items-center gap-2">
+          <BarsFromLeftOutline size="sm" />Detail2
+        </div>
+        <div id="analyzeDetailDisplay">
+          {#if selectedTypes.length === 0}
+            <p>No data to display.</p>
+          {:else if filteredEntries.length > 0}
+          <Table hoverable={true} striped={true}>
+            <TableHead theadClass="none">
+                <TableHeadCell padding="px-0 py-1" class="path">
+                  Path
+                  {#if filteredEntries.some(entry => entry.path.length > 50)}
+                    <button type="button" on:click={togglePathTruncation} aria-label="Toggle path truncation">
+                      {#if isPathTruncated}
+                        <ChevronDoubleRightOutline />
+                      {:else}
+                        <ChevronDoubleLeftOutline />
+                      {/if}
+                    </button>
+                  {/if}
+                </TableHeadCell>
+                <TableHeadCell padding="px-0 py-1" class="domain">
+                  Domain
+                  {#if filteredEntries.some(entry => entry.domain.length > 30)}
+                    <button type="button" on:click={toggleDomainTruncation} aria-label="Toggle domain truncation">
+                      {#if isDomainTruncated}
+                        <ChevronDoubleRightOutline />
+                      {:else}
+                        <ChevronDoubleLeftOutline />
+                      {/if}
+                    </button>
+                  {/if}
+                </TableHeadCell>
+                <TableHeadCell padding="px-0 py-1" class="type">Type</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1" class="type">mimeType</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1" class="status">Status</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1" class="method">Method</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1" class="timestamp">
+                  Timestamp
+                  {#if filteredEntries.some(entry => entry.timestamp.length > 10)}
+                    <button type="button" on:click={toggleTimestampTruncation} aria-label="Toggle timestamp truncation">
+                      {#if isTimestampTruncated}
+                        <ChevronDoubleRightOutline />
+                      {:else}
+                        <ChevronDoubleLeftOutline />
+                      {/if}
+                    </button>
+                  {/if}
+                </TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">Set Cookies</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">Time</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">Size</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">isCached</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">age</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">dns</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">connect</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">ssl</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">send</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">wait</TableHeadCell>
+                <TableHeadCell padding="px-0 py-1">receive</TableHeadCell>
+
+            </TableHead>
+            <TableBody tableBodyClass="divide-y">
+              {#each filteredEntries as entry}
+                <TableBodyRow>
+                  <TableBodyCell tdClass="px-0 py-1" class="path">
+                    {#if entry.path.length > 50}
+                      <span title={entry.url}>{isPathTruncated ? truncateText(entry.path, 50) : entry.path}</span>
+                    {:else}
+                      {entry.path}
+                    {/if}
+                  </TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="domain">
+                    {#if entry.domain.length > 30}
+                      <span title={entry.domain}>{isDomainTruncated ? truncateText(entry.domain, 30) : entry.domain}</span>
+                    {:else}
+                      {entry.domain}
+                    {/if}
+                  </TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="minetype"><span>{entry.type}</span></TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="minetype"><span>{entry.responseMimeType}</span></TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="status {httpStatusCSSClass(entry.status)}">{entry.status}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="method {entry.method}"><span>{entry.method}</span></TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="timestamp">
+                    {#if entry.timestamp.length > 10}
+                      <span title={entry.timestamp}>{isTimestampTruncated ? truncateText(entry.timestamp, 10) : entry.timestamp}</span>
+                    {:else}
+                      {entry.timestamp}
+                    {/if}
+                  </TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="setCookies">{entry.setCookieCount}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="time">{formatTime(entry.time)}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="size">{formatBytes(entry.responseTotalSize)}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="isCached">{entry.isCached}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="age">{entry.age !== null ? entry.age : ''}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="dns">{entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : ''}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="connect">{entry.timings.connect >= 0 ? formatTime(entry.timings.connect) : ''}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="ssl">{entry.timings.ssl >= 0 ? formatTime(entry.timings.ssl) : ''}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="send">{formatTime(entry.timings.send)}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="wait">{formatTime(entry.timings.wait)}</TableBodyCell>
+                  <TableBodyCell tdClass="px-0 py-1" class="receive">{formatTime(entry.timings.receive)}</TableBodyCell>
+                </TableBodyRow>
+              {/each}
+            </TableBody>
+          </Table>
+          {:else}
+            <p>No data to display.</p>
+          {/if}
+            </div>
       </TabItem>
       <TabItem open>
         <div slot="title" class="flex items-center gap-2">
@@ -808,7 +980,7 @@ function handleStatusRangeClick(statusRange) {
             </thead>
             <tbody>
               {#each filteredEntries as entry}
-                <tr>
+                <tr style="border-bottom:1px solid #ccc">
                   <th class="path">
                     {#if entry.path.length > 50}
                       <span title={entry.url}>{isPathTruncated ? truncateText(entry.path, 50) : entry.path}</span>
@@ -1017,7 +1189,7 @@ function handleStatusRangeClick(statusRange) {
               </thead>
               <tbody>
                 {#each filteredEntries as entry}
-                  <tr>
+                  <tr style="border-bottom:1px solid #ccc">
                     <th class="path">
                       {#if entry.path.length > 30}
                         <span title={entry.url}>{isPathTruncated ? truncateText(entry.path, 30) : entry.path}</span>
@@ -1210,14 +1382,26 @@ function handleStatusRangeClick(statusRange) {
   tbody th.status{
     text-align: center;
   }
-  tbody th.status.success {
+  tbody th.status.success{
+      background: #99ffa2;
+  }
+  :global(tbody td.status.success) {
+      background: #99ffa2;
+  }
+  :global(tbody td.status.success) {
       background: #99ffa2;
   }
 
-  tbody th.status.redirect {
+  tbody th.status.redirect{
       background: #eaff99;
   }
+  :global(tbody td.status.redirect) {
+    background: #eaff99;;
+  }
   tbody th.status.cliError {
+      background: rgb(255, 153, 161);
+  }
+  :global(td.status.cliError) {
       background: rgb(255, 153, 161);
   }
   tbody td.setCookies,
@@ -1235,6 +1419,6 @@ function handleStatusRangeClick(statusRange) {
   .truncate-icon {
     cursor: pointer;
   }
-  
+
 
 </style>
