@@ -1,7 +1,8 @@
 <script>
   import { onMount } from 'svelte';
-  import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
+  import { formatTimestamp, truncateText, escapeForMermaid as escapeForSequence ,httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
+  import PieChart from '$lib/components/PieChart.svelte';
   import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
   import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
   import mermaid from 'mermaid';
@@ -34,6 +35,11 @@
   let sequenceTitle =''; 
   let truncatedValues = {};
 
+  ///chart
+  let statusCodeData = [];
+  let mimeTypeData = [];
+
+  //diagrams
   let marmaidDivElem;
   let plantUMLCode = '';
   let mermaidCode = '';
@@ -167,6 +173,7 @@
 
       //const connectionSpeed = estimateConnectionSpeed(entries);
       //console.log(connectionSpeed);
+
     };
 
     reader.readAsText(file);
@@ -186,13 +193,13 @@
         text: decodeURIComponent(postData.text),
         params: postData.params.map(param => ({
           name: decodeURIComponent(param.name),
-          value: decodeURIComponent(param.value)
+          value: escapeForSequence(decodeURIComponent(param.value))
         }))
       };
     } else if (mimeType === 'text/plain') {
       requestPostData = {
         mimeType: mimeType,
-        text: decodeURIComponent(postData.text)
+        text: escapeForSequence(decodeURIComponent(postData.text))
       };
     } else if (mimeType === 'application/json') {
       try {
@@ -203,19 +210,19 @@
           text: decodedText,
           params: Object.entries(jsonData).map(([name, value]) => ({
             name: decodeURIComponent(name),
-            value: decodeURIComponent(value.toString())
+            value: escapeForSequence(decodeURIComponent(value.toString()))
           }))
         };
       } catch (error) {
         requestPostData = {
           mimeType: mimeType,
-          text: decodeURIComponent(postData.text)
+          text: escapeForSequence(decodeURIComponent(postData.text))
         };
       }
     } else {
       requestPostData = {
         mimeType: mimeType,
-        text: decodeURIComponent(postData.text)
+        text: escapeForSequence(decodeURIComponent(postData.text))
       };
     }
 
@@ -282,6 +289,67 @@
     }
     return domain;
   }
+
+  function aggregateData(entries, key) {
+    const aggregatedData = entries.reduce((acc, entry) => {
+      const value = entry[key].replace( /\//g , "\/" );
+      if (acc[value]) {
+        acc[value]++;
+      } else {
+        acc[value] = 1;
+      }
+      return acc;
+    }, {});
+
+    return Object.entries(aggregatedData).map(([name, value]) => ({ name, value }));
+  }
+
+  function getStatusCodeData() {
+    if (!filteredEntries || filteredEntries.length === 0) {
+      return [];
+    }
+    const statusCodeRanges = [
+      { min: 100, max: 199, label: '100' },
+      { min: 200, max: 299, label: '200' },
+      { min: 300, max: 399, label: '300' },
+      { min: 400, max: 499, label: '400' },
+      { min: 500, max: 599, label: '500' },
+      { other: true, label: 'Other' }
+    ];
+
+    const statusCodeData = filteredEntries.reduce((acc, entry) => {
+      const statusCode = entry.status;
+      const range = statusCodeRanges.find(range =>
+        (range.other && (statusCode < 100 || statusCode >= 600)) ||
+        (statusCode >= range.min && statusCode <= range.max)
+      );
+      const label = range.label;
+      if (acc[label]) {
+        acc[label]++;
+      } else {
+        acc[label] = 1;
+      }
+      return acc;
+    }, {});
+
+    return Object.entries(statusCodeData).map(([name, value]) => ({ name, value }));
+  }
+
+  function getMimeTypeData() {
+    if (!filteredEntries || filteredEntries.length === 0) {
+      return [];
+    }
+
+    const mimeTypeOrder = ['Fetch/XHR', 'Doc', 'CSS', 'JS', 'Font', 'Img', 'Media', 'Manifest', 'WS', 'Wasm', 'Other'];
+    const mimeTypeData = mimeTypeOrder.map(mimeType => {
+      const value = filteredEntries.filter(entry => entry.type === mimeType).length;
+      return { name: mimeType, value };
+    });
+
+    return mimeTypeData;
+  }
+
+
   
   $: filteredEntries = entries.filter(entry => {
       const domain_path = entry.domain + entry.path;
@@ -329,8 +397,18 @@
     }));
 
 
-  $: {
-    console.log(filteredEntries);
+    $: {
+    //console.log(filteredEntries);
+    if (filteredEntries) {
+      statusCodeData = getStatusCodeData(filteredEntries);
+      mimeTypeData = getMimeTypeData(filteredEntries);
+      console.log(statusCodeData);
+      console.log(mimeTypeData);
+    }
+  }
+  
+    $: {
+    //console.log(filteredEntries);
     if (filteredEntries) {
       mermaidCode = generateMermaidSequence();
       plantUMLCode = generatePlantUMLSequence();
@@ -432,7 +510,7 @@ function handleStatusRangeClick(statusRange) {
   }
 
   function handleAllChange(event) {
-    allSelected = event.target.checked;
+      allSelected = event.target.checked;
     if (allSelected) {
       selectedTypes = [...communicationTypes];
     } else {
@@ -625,7 +703,6 @@ function handleStatusRangeClick(statusRange) {
     return plantUMLCode;
   }
 
-
 </script>
 <main class="p-4">
   <div id="action">
@@ -795,17 +872,9 @@ function handleStatusRangeClick(statusRange) {
 
   <div id="display">
     <Tabs tabStyle="underline">
-      <TabItem >
+      <TabItem>
         <div slot="title" class="flex items-center gap-2">
-          <ChartPieSolid size="sm" />Overview
-        </div>
-        <div id="analyzeOverviewDisplay">
-          <div id="buildTimestamp">Build ver.20240530183909</div>
-        </div>
-      </TabItem>
-      <TabItem open>
-        <div slot="title" class="flex items-center gap-2">
-          <BarsFromLeftOutline size="sm" />Detail2
+          <BarsFromLeftOutline size="sm" />Detail2(experimental)
         </div>
         <div id="analyzeDetailDisplay">
           {#if selectedTypes.length === 0}
@@ -912,7 +981,7 @@ function handleStatusRangeClick(statusRange) {
           {:else}
             <p>No data to display.</p>
           {/if}
-            </div>
+        </div>
       </TabItem>
       <TabItem open>
         <div slot="title" class="flex items-center gap-2">
@@ -1253,6 +1322,35 @@ function handleStatusRangeClick(statusRange) {
           {/if}
         </div>
       </TabItem>
+      <TabItem>
+        <div slot="title" class="flex items-center gap-2">
+          <ChartPieSolid size="sm" />Statistics
+        </div>
+        <div id="analyzeOverviewDisplay">
+          {#if filteredEntries.length > 0}
+          <div id="chart" style="display: flex; flex-direction: row; align-items: center;">
+            <div>
+              <h2 class="text-lg font-semibold mb-4">HTTP Status Code Distribution</h2>
+              <div style="width: 100%; max-width: 400px; margin: 0 auto;">
+                <PieChart data={statusCodeData} width={400} height={230} />
+              </div>
+            </div>
+
+            <div>
+              <h2 class="text-lg font-semibold mb-4">MIME Type Distribution</h2>
+              <div style="width: 100%; max-width: 400px; margin: 0 auto;">
+                <PieChart data={mimeTypeData} width={400} height={230} />
+              </div>
+            </div>
+      
+          </div>
+          {/if}
+
+          
+
+          <div id="buildTimestamp">Build ver.20240530183909</div>
+        </div>
+      </TabItem>
     </Tabs>
 </div>
 </main>
@@ -1356,10 +1454,10 @@ function handleStatusRangeClick(statusRange) {
   }
   
   tbody th.path{
-    background-color: #f2f2f2;
+    background-color: #f9fafb;
   }
   tbody th.domain{
-    background-color: #f2f2f2;
+    background-color: #f9fafb;
   }
   tbody th.timestamp {
     background: #efefef;

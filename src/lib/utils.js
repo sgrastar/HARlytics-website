@@ -18,6 +18,32 @@ export function formatTimestamp(date) {
     }
   }
 
+  export const escapeForMermaid = (text) => {
+    return text
+      .replace(/\\/g, '\\\\')   // バックスラッシュ
+      .replace(/\$/g, '\\$')    // ドル記号
+      .replace(/\#/g, '\\#')    // ハッシュ記号
+      .replace(/\_/g, '\\_')    // アンダースコア
+      .replace(/\~/g, '\\~')    // チルダ
+      .replace(/\*/g, '\\*')    // アスタリスク
+      .replace(/\+/g, '\\+')    // プラス記号
+      .replace(/\=/g, '\\=')    // イコール記号
+      .replace(/\|/g, '\\|')    // バーティカルバー
+      .replace(/\[/g, '\\[')    // 開き角括弧
+      .replace(/\]/g, '\\]')    // 閉じ角括弧
+      .replace(/\{/g, '\\{')    // 開き波括弧
+      .replace(/\}/g, '\\}')    // 閉じ波括弧
+      .replace(/\(/g, '\\(')    // 開き丸括弧
+      .replace(/\)/g, '\\)')    // 閉じ丸括弧
+      .replace(/\>/g, '\\>')    // 大なり記号
+      .replace(/\</g, '\\<')    // 小なり記号
+      .replace(/\n/g, '\\n')    // 改行
+      .replace(/\r/g, '\\r')    // 復帰
+      .replace(/\t/g, '\\t')    // タブ
+      .replace(/\'/g, '\\\'')   // シングルクォート
+      .replace(/\"/g, '\\"');   // ダブルクォート
+  };
+
   export function httpStatusCSSClass(statusNo) {
     if (100 <= statusNo && statusNo <= 199) {
       return "info"; // Information responses

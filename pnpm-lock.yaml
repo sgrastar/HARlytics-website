@@ -20,6 +20,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.19
         version: 10.4.19(postcss@8.4.38)
+      d3:
+        specifier: ^7.9.0
+        version: 7.9.0
       flowbite:
         specifier: ^2.3.0
         version: 2.3.0
