@@ -19,7 +19,7 @@
   <header class="text-white body-font bg-gray-600">
     <div class=" mx-auto flex flex-wrap px-4 py-1 flex-col md:flex-row items-center">
       <div>
-        <span class="">HAR Analyzer</span>
+        <span class="">HARlytics</span>
         {#if isLive}
           <Badge large color="indigo" class="ml-4">Cloud Edition</Badge>
         {/if}
@@ -34,12 +34,12 @@
   </header>
 
   <Modal title="License" bind:open={scrollingModal}>
-    <h3 class="text-lg font-semibold ">HAR Analyzer</h3>
+    <h3 class="text-lg font-semibold ">HARlytics</h3>
     <p class="text-base leading-relaxed text-gray-500 dark:text-gray-400">
       The MIT License (MIT)
       </p>
       <p class="text-base leading-relaxed text-gray-500 dark:text-gray-400">
-      Copyright (c) 2024 Yuta Hoshina &lt;yuta@sgrastar.org&gt;<br>(<a href="https://github.com/sgrastar/har-analyzer" target="_blank">https://github.com/sgrastar/har-analyzer</a>)
+      Copyright (c) 2024 Yuta Hoshina &lt;yuta@sgrastar.org&gt;<br>(<a href="https://github.com/sgrastar/HARlytics" target="_blank">https://github.com/sgrastar/HARlytics</a>)
       </p>
       
       <p class="text-base leading-relaxed text-gray-500 dark:text-gray-400">

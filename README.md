@@ -1,4 +1,4 @@
-# HAR Analyzer
+# HARlytics
 
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fsgrastar%2Fhar-analyzer.svg?type=shield&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fsgrastar%2Fhar-analyzer?ref=badge_shield&issueType=license)
 
@@ -11,7 +11,7 @@ This is a tool to help analyze HAR (HTTP Archive File) files. This tool helps wi
 
 The MIT License (MIT)
 
-Copyright (c) 2024-present, Yuta Hoshina <yuta@sgrastar.org> (https://github.com/sgrastar/har-analyzer)
+Copyright (c) 2024-present, Yuta Hoshina <yuta@sgrastar.org> (https://github.com/sgrastar/HARlytics)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
