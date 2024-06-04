@@ -3,13 +3,16 @@
   import { formatTimestamp, truncateText, escapeForMermaid as escapeForSequence ,httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
   import PieChart from '$lib/components/PieChart.svelte';
-  import { Fileupload, Input, Label, Button, Toggle, Tabs, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
+  import { Fileupload, Input, Label, Button, Toggle, Tabs, Badge, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
   import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
   import mermaid from 'mermaid';
 
   let logFilename = '';
   let logVersion = '';
   let logCreator = '';
+  let hasPagesInfo = false;
+  let hasInitiatorInfo = false;
+
   let pages = [];
   let entries = [];
   let urlFilter = '';
@@ -89,9 +92,9 @@
       entries = harContent.log.entries;
       logVersion = harContent.log.version;
       logCreator = harContent.log.creator.name + "(" +  harContent.log.creator.version +  ")";
-
-      console.log(pages);
       
+      pages ? hasPagesInfo = true: hasPagesInfo = false;
+      harContent.log.entries[0]._initiator ? hasInitiatorInfo = true : hasInitiatorInfo = false;
 
       entries = entries.map(entry => {
         const url = new URL(entry.request.url);
@@ -581,7 +584,7 @@ function handleStatusRangeClick(statusRange) {
       }
 
       let mermaidCode = 'sequenceDiagram\n';
-      if (addTitle) {
+      if (addTitle && sequenceTitle) {
         //console.log(sequenceTitle);
         mermaidCode += `title: ${sequenceTitle}\n`;
       }
@@ -642,7 +645,7 @@ function handleStatusRangeClick(statusRange) {
 
     let plantUMLCode = '@startuml\n';
 
-    if (addTitle) {
+    if (addTitle && sequenceTitle) {
       //console.log(sequenceTitle);
       plantUMLCode += `title: ${sequenceTitle}\n`;
     }
@@ -714,6 +717,12 @@ function handleStatusRangeClick(statusRange) {
         </div>
         
         <span>Log version : {logVersion} / {logCreator}</span><br>
+        {#if hasPagesInfo == true}
+        <Badge rounded color="indigo">Pages</Badge>
+        {/if}
+        {#if hasInitiatorInfo == true}
+        <Badge rounded color="indigo">_initiator</Badge>
+        {/if}
       </div>
 
       <div class="col-span-7 bg-gray-200 p-2 rounded">
@@ -1348,7 +1357,7 @@ function handleStatusRangeClick(statusRange) {
 
           
 
-          <div id="buildTimestamp">Build ver.20240603175304</div>
+          <div id="buildTimestamp">Build ver.20240604224514</div>
         </div>
       </TabItem>
     </Tabs>
@@ -1415,6 +1424,7 @@ function handleStatusRangeClick(statusRange) {
   
   thead th.path{
     width: 8em;
+    z-index: 10;
     background-color: #f2f2f2;
   }
   thead th.domain{
@@ -1480,10 +1490,11 @@ function handleStatusRangeClick(statusRange) {
   tbody th.status{
     text-align: center;
   }
+  tbody th.status.info,
   tbody th.status.success{
       background: #99ffa2;
   }
-  :global(tbody td.status.success) {
+  :global(tbody td.status.info) {
       background: #99ffa2;
   }
   :global(tbody td.status.success) {
@@ -1501,6 +1512,14 @@ function handleStatusRangeClick(statusRange) {
   }
   :global(td.status.cliError) {
       background: rgb(255, 153, 161);
+  }
+  tbody th.status.srvError {
+    background: #ff4554;
+    color: #fff;
+  }
+  :global(tbody th.status.srvError) {
+    background: #ff4554;
+    color: #fff;
   }
   tbody td.setCookies,
   tbody td.time,
