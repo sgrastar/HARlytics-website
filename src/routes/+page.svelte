@@ -3,7 +3,7 @@
   import { formatTimestamp, truncateText, escapeForMermaid as escapeForSequence ,httpStatusCSSClass, formatTime, formatBytes, exportToCSV } from '$lib/utils';
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
   import PieChart from '$lib/components/PieChart.svelte';
-  import { Fileupload, Input, Label, Button, Toggle, Tabs, Badge, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
+  import { Fileupload, Input, Range, Label, Button, Toggle, Tabs, Badge, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
   import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
   import mermaid from 'mermaid';
 
@@ -28,14 +28,7 @@
   let isPathTruncated = true;
   let isDomainTruncated = true;
   let isTimestampTruncated = true;
-  let addLifeline = true;
-  let addRequestCookies = false;
-  let addRequestQueryString = false;
-  let addRequestPostData = false;
-  let addResponseCookies = false;
-  let addAutoNumber = false;
-  let addTitle = true;
-  let sequenceTitle =''; 
+  
   let truncatedValues = {};
 
   ///chart
@@ -46,6 +39,22 @@
   let marmaidDivElem;
   let plantUMLCode = '';
   let mermaidCode = '';
+  let truncateQueryStrings = true;
+  let truncateQueryStringsLength = 25;
+  let truncatePostData = true;
+  let truncatePostDataLength = 25;
+  let truncateReqCookie = true;
+  let truncateReqCookieLength = 25;
+  let truncateResCookie = true;
+  let truncateResCookieLength = 25;
+  let addLifeline = true;
+  let addRequestCookies = false;
+  let addRequestQueryString = false;
+  let addRequestPostData = false;
+  let addResponseCookies = false;
+  let addAutoNumber = false;
+  let addTitle = true;
+  let sequenceTitle =''; 
 
   const statusRanges = [
     //{ label: '100', min: 100, max: 199 },
@@ -420,7 +429,7 @@
 
 
   $: {
-    if (addRequestCookies || addResponseCookies || addAutoNumber || addTitle || addLifeline || sequenceTitle || addRequestQueryString || addRequestPostData) {
+    if (addRequestCookies || addResponseCookies || addAutoNumber || addTitle || addLifeline || sequenceTitle || addRequestQueryString || addRequestPostData || truncateQueryStrings || truncateQueryStringsLength || truncatePostData || truncatePostDataLength || truncateReqCookie || truncateReqCookieLength || truncateResCookie || truncateResCookieLength) {
       //console.log("checkbox");
       if (filteredEntries && filteredEntries.length !== 0) {
         //console.log("checkbox and filter");
@@ -547,6 +556,14 @@ function handleStatusRangeClick(statusRange) {
     }
   }
 
+  function splitByLength(text, length) {
+    const lines = [];
+    for (let i = 0; i < text.length; i += length) {
+      lines.push(text.slice(i, i + length));
+    }
+    return lines;
+  }
+
 
   /**
      * @param {unknown} err
@@ -602,21 +619,54 @@ function handleStatusRangeClick(statusRange) {
           mermaidCode += `  activate ${entry.domain}\n`;
         }
         
+        //QueryString
         if (addRequestQueryString && entry.requestQueryString.length > 0) {
-          const requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, 25)}: ${truncateText(Qstring.value, 25)}`).join('<br>');
-          mermaidCode += `  note over ${entry.domain}: [Query String]<br>${requestQueryStringString}\n`;
+          let requestQueryStringString = '';
+          
+          if (truncateQueryStrings) {
+            requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, truncateQueryStringsLength)}: ${truncateText(Qstring.value, truncateQueryStringsLength)}`).join('<br>');
+            console.log(requestQueryStringString);
+          } else {
+            requestQueryStringString = entry.requestQueryString.map(Qstring => {
+              const lines = splitByLength(`${Qstring.name}: ${Qstring.value}`, 50);
+              return lines.join('<br>');
+            }).join('<br>');
+          }
+          mermaidCode += `note over ${entry.domain}: [Query String]<br>${requestQueryStringString}\n`;
         }
 
+        // PostData
         if (addRequestPostData && entry.requestPostData) {
-          const postDataString = entry.requestPostData.params
-            ? entry.requestPostData.params.map(param => `${truncateText(param.name, 25)}: ${truncateText(param.value, 25)}`).join('<br>')
-            : truncateText(entry.requestPostData.text, 50);
+          let postDataString = '';
+
+          if (truncatePostData) {
+            postDataString = entry.requestPostData.params
+              ? entry.requestPostData.params.map(param => `${truncateText(param.name, truncatePostDataLength)}: ${truncateText(param.value, truncatePostDataLength)}`).join('<br>')
+              : truncateText(entry.requestPostData.text, truncatePostDataLength);
+          } else {
+            postDataString = entry.requestPostData.params
+              ? entry.requestPostData.params.map(param => {
+                  const lines = splitByLength(`${param.name}: ${param.value}`, 50);
+                  return lines.join('<br>');
+                }).join('<br>')
+              : splitByLength(entry.requestPostData.text, 50).join('<br>');
+          }
           mermaidCode += `note over ${entry.domain}: [postData] ${entry.requestPostData.mimeType}<br>${postDataString}\n`;
         }
-
+        
+        // Request Cookies
         if (addRequestCookies && entry.requestCookies.length > 0) {
-          const cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name, 25)}: ${truncateText(cookie.value, 25)}`).join('<br>');
-          mermaidCode += `  note over ${entry.domain}: [Request Cookies]<br>${cookieString}\n`;
+          let cookieString = '';
+
+          if (truncateReqCookie) {
+            cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name, truncateReqCookieLength)}: ${truncateText(cookie.value, truncateReqCookieLength)}`).join('<br>');
+          } else {
+            cookieString = entry.requestCookies.map(cookie => {
+              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
+              return lines.join('<br>');
+            }).join('<br>');
+          }
+          mermaidCode += `note over ${entry.domain}: [Request Cookies]<br>${cookieString}\n`;
         }
 
         //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
@@ -632,10 +682,21 @@ function handleStatusRangeClick(statusRange) {
           mermaidCode += `  deactivate ${entry.domain}\n`;
         }
 
+        // Response Cookies
         if (addResponseCookies && entry.responseCookies.length > 0) {
-          const cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, 25)}: ${truncateText(cookie.value, 25)}`).join('<br>');
-          mermaidCode += `  note over Browser: [Response Cookies]<br>${cookieString}\n`;
+          let cookieString = '';
+
+          if (truncateResCookie) {
+            cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, truncateResCookieLength)}: ${truncateText(cookie.value, truncateResCookieLength)}`).join('<br>');
+          } else {
+            cookieString = entry.responseCookies.map(cookie => {
+              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
+              return lines.join('<br>');
+            }).join('<br>');
+          }
+          mermaidCode += `note over Browser: [Response Cookies]<br>${cookieString}\n`;
         }
+
       });
 
       return mermaidCode;
@@ -664,22 +725,56 @@ function handleStatusRangeClick(statusRange) {
         plantUMLCode += `activate "${entry.domain}"\n`;
       }
 
+
+      //QueryString
       if (addRequestQueryString && entry.requestQueryString.length > 0) {
-        const requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, 25)}: ${truncateText(Qstring.value, 25)}`).join('\\n');
-        plantUMLCode += `  note over "${entry.domain}": **[Query String]**\\n${requestQueryStringString}\n`;
-      }
+          let requestQueryStringString = '';
+          
+          if (truncateQueryStrings) {
+            requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, truncateQueryStringsLength)}: ${truncateText(Qstring.value, truncateQueryStringsLength)}`).join('\\n');
+            console.log(requestQueryStringString);
+          } else {
+            requestQueryStringString = entry.requestQueryString.map(Qstring => {
+              const lines = splitByLength(`${Qstring.name}: ${Qstring.value}`, 50);
+              return lines.join('\\n');
+            }).join('\\n');
+          }
+          plantUMLCode += `note over "{entry.domain}": **[Query String]**\\n${requestQueryStringString}\n`;
+        }
 
+      // PostData
       if (addRequestPostData && entry.requestPostData) {
-        const postDataString = entry.requestPostData.params
-          ? entry.requestPostData.params.map(param => `${truncateText(param.name, 25)}: ${truncateText(param.value, 25)}`).join('\\n')
-          : truncateText(entry.requestPostData.text, 50);
-          plantUMLCode += `note over "${entry.domain}": **[postData]** ${entry.requestPostData.mimeType}\\n${postDataString}\n`;
-      }
+          let postDataString = '';
 
+          if (truncatePostData) {
+            postDataString = entry.requestPostData.params
+              ? entry.requestPostData.params.map(param => `${truncateText(param.name, truncatePostDataLength)}: ${truncateText(param.value, truncatePostDataLength)}`).join('\\n')
+              : truncateText(entry.requestPostData.text, truncatePostDataLength);
+          } else {
+            postDataString = entry.requestPostData.params
+              ? entry.requestPostData.params.map(param => {
+                  const lines = splitByLength(`${param.name}: ${param.value}`, 50);
+                  return lines.join('\\n');
+                }).join('\\n')
+              : splitByLength(entry.requestPostData.text, 50).join('\\n');
+          }
+          plantUMLCode += `note over "${entry.domain}": **[postData]** ${entry.requestPostData.mimeType}\\n${postDataString}\n`;
+        }
+
+      // Request Cookies
       if (addRequestCookies && entry.requestCookies.length > 0) {
-        const cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name,25)}: ${truncateText(cookie.value, 25)}`).join('\\n');
-        plantUMLCode += `note over "${entry.domain}": **[Request Cookies]**\\n${cookieString}\n`;
-      }
+          let cookieString = '';
+
+          if (truncateReqCookie) {
+            cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name, truncateReqCookieLength)}: ${truncateText(cookie.value, truncateReqCookieLength)}`).join('\\n');
+          } else {
+            cookieString = entry.requestCookies.map(cookie => {
+              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
+              return lines.join('\\n');
+            }).join('\\n');
+          }
+          plantUMLCode += `note over "${entry.domain}": **[Request Cookies]**\\n${cookieString}\n`;
+        }
 
       if( entry.status >= 300 && entry.status <= 399){
         plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
@@ -689,12 +784,20 @@ function handleStatusRangeClick(statusRange) {
         plantUMLCode += `"${entry.domain}" -> Browser: ${responseArrow}\n`;
       }
 
-      //plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
-
+      // Response Cookies
       if (addResponseCookies && entry.responseCookies.length > 0) {
-        const cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, 25)}: ${truncateText(cookie.value, 25)}`).join('\\n');
-        plantUMLCode += `note over Browser: **[Response Cookies]**\\n${cookieString}\n`;
-      }
+          let cookieString = '';
+
+          if (truncateResCookie) {
+            cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, truncateResCookieLength)}: ${truncateText(cookie.value, truncateResCookieLength)}`).join('\\n');
+          } else {
+            cookieString = entry.responseCookies.map(cookie => {
+              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
+              return lines.join('\\n');
+            }).join('\\n');
+          }
+          plantUMLCode += `note over Browser: **[Response Cookies]**\\n${cookieString}\n`;
+        }
 
       if(addLifeline){
         plantUMLCode += `deactivate "${entry.domain}"\n`;
@@ -1031,19 +1134,8 @@ function handleStatusRangeClick(statusRange) {
                 <th class="type">mimeType</th>
                 <th class="status">Status</th>
                 <th class="method">Method</th>
-                <th class="timestamp">
-                  Timestamp
-                  {#if filteredEntries.some(entry => entry.timestamp.length > 10)}
-                    <button type="button" on:click={toggleTimestampTruncation} aria-label="Toggle timestamp truncation">
-                      {#if isTimestampTruncated}
-                        <ChevronDoubleRightOutline />
-                      {:else}
-                        <ChevronDoubleLeftOutline />
-                      {/if}
-                    </button>
-                  {/if}
-                </th>
-                <th>Set Cookies</th>
+                <th class="timestamp">Timestamp</th>
+                <th>Set<br>Cookies</th>
                 <th>Time</th>
                 <th>Size</th>
                 <th>isCached</th>
@@ -1077,13 +1169,7 @@ function handleStatusRangeClick(statusRange) {
                   <th class="minetype"><span>{entry.responseMimeType}</span></th>
                   <th class="status {httpStatusCSSClass(entry.status)}">{entry.status}</th>
                   <th class="method {entry.method}"><span>{entry.method}</span></th>
-                  <th class="timestamp">
-                    {#if entry.timestamp.length > 10}
-                      <span title={entry.timestamp}>{isTimestampTruncated ? truncateText(entry.timestamp, 10) : entry.timestamp}</span>
-                    {:else}
-                      {entry.timestamp}
-                    {/if}
-                  </th>
+                  <th class="timestamp">{entry.timestamp}</th>
                   <td class="setCookies">{entry.setCookieCount}</td>
                   <td class="time">{formatTime(entry.time)}</td>
                   <td class="size">{formatBytes(entry.responseTotalSize)}</td>
@@ -1131,16 +1217,52 @@ function handleStatusRangeClick(statusRange) {
             <h4 class="text-base mb-2">Notes Settings</h4>
             
             <div class="mb-4">
-              <Checkbox bind:checked={addRequestQueryString}>Show queryString</Checkbox>
+              <Checkbox bind:checked={addRequestQueryString}>Show QueryString</Checkbox>
+              {#if addRequestQueryString}
+                <Checkbox bind:checked={truncateQueryStrings} class="ml-4 mt-2">Truncate QueryString</Checkbox>
+                {#if truncateQueryStrings}
+                  <div class="mt-1" style="margin-left: 3.1em;">
+                    <Label>Number of characters to show<span>: {truncateQueryStringsLength}</span></Label>
+                    <Range size="sm" id="range-truncate-query-strings" min="5" max="100" bind:value={truncateQueryStringsLength} step="5" />
+                  </div>
+                {/if}
+              {/if}
             </div>
             <div class="mb-4">
               <Checkbox bind:checked={addRequestPostData}>Show postData</Checkbox>
+              {#if addRequestPostData}
+                <Checkbox bind:checked={truncatePostData} class="ml-4 mt-2">Truncate postData</Checkbox>
+                {#if truncatePostData}
+                  <div class="mt-1" style="margin-left: 3.1em;">
+                    <Label>Number of characters to show<span>: {truncatePostDataLength}</span></Label>
+                    <Range size="sm" id="range-truncate-post-data" min="5" max="100" bind:value={truncatePostDataLength} step="5" />
+                  </div>
+                {/if}
+              {/if}
             </div>
             <div class="mb-4">
               <Checkbox bind:checked={addRequestCookies}>Show Request Cookies</Checkbox>
+              {#if addRequestCookies}
+                <Checkbox bind:checked={truncateReqCookie} class="ml-4 mt-2">Truncate Request Cookies</Checkbox>
+                {#if truncateReqCookie}
+                  <div class="mt-1" style="margin-left: 3.1em;">
+                    <Label>Number of characters to show<span>: {truncateReqCookieLength}</span></Label>
+                    <Range size="sm" id="range-truncate-req-cookie" min="5" max="100" bind:value={truncateReqCookieLength} step="5" />
+                  </div>
+                {/if}
+              {/if}
             </div>
             <div class="mb-4">
               <Checkbox bind:checked={addResponseCookies}>Show Response Cookies</Checkbox>
+              {#if addResponseCookies}
+                <Checkbox bind:checked={truncateResCookie} class="ml-4 mt-2">Truncate Response Cookies</Checkbox>
+                {#if truncateResCookie}
+                  <div class="mt-1" style="margin-left: 3.1em;">
+                    <Label>Number of characters to show<span>: {truncateResCookieLength}</span></Label>
+                    <Range size="sm" id="range-truncate-req-cookie" min="5" max="100" bind:value={truncateResCookieLength} step="5" />
+                  </div>
+                {/if}
+              {/if}
             </div>
           </div>
           <div class="col-span-8 p-4">
