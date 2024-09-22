@@ -739,7 +739,7 @@ function handleStatusRangeClick(statusRange) {
               return lines.join('\\n');
             }).join('\\n');
           }
-          plantUMLCode += `note over "{entry.domain}": **[Query String]**\\n${requestQueryStringString}\n`;
+          plantUMLCode += `note over "${entry.domain}": **[Query String]**\\n${requestQueryStringString}\n`;
         }
 
       // PostData
@@ -984,117 +984,7 @@ function handleStatusRangeClick(statusRange) {
 
   <div id="display">
     <Tabs tabStyle="underline">
-      <TabItem>
-        <div slot="title" class="flex items-center gap-2">
-          <BarsFromLeftOutline size="sm" />Detail2(experimental)
-        </div>
-        <div id="analyzeDetailDisplay">
-          {#if selectedTypes.length === 0}
-            <p>No data to display.</p>
-          {:else if filteredEntries.length > 0}
-          <Table hoverable={true} striped={true}>
-            <TableHead theadClass="none">
-                <TableHeadCell padding="px-0 py-1" class="path">
-                  Path
-                  {#if filteredEntries.some(entry => entry.path.length > 50)}
-                    <button type="button" on:click={togglePathTruncation} aria-label="Toggle path truncation">
-                      {#if isPathTruncated}
-                        <ChevronDoubleRightOutline />
-                      {:else}
-                        <ChevronDoubleLeftOutline />
-                      {/if}
-                    </button>
-                  {/if}
-                </TableHeadCell>
-                <TableHeadCell padding="px-0 py-1" class="domain">
-                  Domain
-                  {#if filteredEntries.some(entry => entry.domain.length > 30)}
-                    <button type="button" on:click={toggleDomainTruncation} aria-label="Toggle domain truncation">
-                      {#if isDomainTruncated}
-                        <ChevronDoubleRightOutline />
-                      {:else}
-                        <ChevronDoubleLeftOutline />
-                      {/if}
-                    </button>
-                  {/if}
-                </TableHeadCell>
-                <TableHeadCell padding="px-0 py-1" class="type">Type</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1" class="type">mimeType</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1" class="status">Status</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1" class="method">Method</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1" class="timestamp">
-                  Timestamp
-                  {#if filteredEntries.some(entry => entry.timestamp.length > 10)}
-                    <button type="button" on:click={toggleTimestampTruncation} aria-label="Toggle timestamp truncation">
-                      {#if isTimestampTruncated}
-                        <ChevronDoubleRightOutline />
-                      {:else}
-                        <ChevronDoubleLeftOutline />
-                      {/if}
-                    </button>
-                  {/if}
-                </TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">Set Cookies</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">Time</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">Size</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">isCached</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">age</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">dns</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">connect</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">ssl</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">send</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">wait</TableHeadCell>
-                <TableHeadCell padding="px-0 py-1">receive</TableHeadCell>
 
-            </TableHead>
-            <TableBody tableBodyClass="divide-y">
-              {#each filteredEntries as entry}
-                <TableBodyRow>
-                  <TableBodyCell tdClass="px-0 py-1" class="path">
-                    {#if entry.path.length > 50}
-                      <span title={entry.url}>{isPathTruncated ? truncateText(entry.path, 50) : entry.path}</span>
-                    {:else}
-                      {entry.path}
-                    {/if}
-                  </TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="domain">
-                    {#if entry.domain.length > 30}
-                      <span title={entry.domain}>{isDomainTruncated ? truncateText(entry.domain, 30) : entry.domain}</span>
-                    {:else}
-                      {entry.domain}
-                    {/if}
-                  </TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="minetype"><span>{entry.type}</span></TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="minetype"><span>{entry.responseMimeType}</span></TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="status {httpStatusCSSClass(entry.status)}">{entry.status}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="method {entry.method}"><span>{entry.method}</span></TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="timestamp">
-                    {#if entry.timestamp.length > 10}
-                      <span title={entry.timestamp}>{isTimestampTruncated ? truncateText(entry.timestamp, 10) : entry.timestamp}</span>
-                    {:else}
-                      {entry.timestamp}
-                    {/if}
-                  </TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="setCookies">{entry.setCookieCount}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="time">{formatTime(entry.time)}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="size">{formatBytes(entry.responseTotalSize)}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="isCached">{entry.isCached}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="age">{entry.age !== null ? entry.age : ''}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="dns">{entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : ''}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="connect">{entry.timings.connect >= 0 ? formatTime(entry.timings.connect) : ''}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="ssl">{entry.timings.ssl >= 0 ? formatTime(entry.timings.ssl) : ''}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="send">{formatTime(entry.timings.send)}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="wait">{formatTime(entry.timings.wait)}</TableBodyCell>
-                  <TableBodyCell tdClass="px-0 py-1" class="receive">{formatTime(entry.timings.receive)}</TableBodyCell>
-                </TableBodyRow>
-              {/each}
-            </TableBody>
-          </Table>
-          {:else}
-            <p>No data to display.</p>
-          {/if}
-        </div>
-      </TabItem>
       <TabItem open>
         <div slot="title" class="flex items-center gap-2">
           <BarsFromLeftOutline size="sm" />Detail
@@ -1479,7 +1369,7 @@ function handleStatusRangeClick(statusRange) {
 
           
 
-          <div id="buildTimestamp">Build ver.20240604224514</div>
+          <div id="buildTimestamp">Build ver.20240923030029</div>
         </div>
       </TabItem>
     </Tabs>

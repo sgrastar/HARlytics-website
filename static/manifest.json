@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
-    "name": "HAR Analyzer",
-    "version": "0.0.1",
+    "name": "HARlytics",
+    "version": "1.0.0",
     "description": "A tool for analyzing HAR files",
     "icons": {
       "16": "favicon.png",
