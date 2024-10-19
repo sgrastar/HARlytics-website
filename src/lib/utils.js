@@ -10,12 +10,10 @@ export function formatTimestamp(date) {
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${milliseconds}`;
   }
   
-  export function truncateText(text,len) {
-    if (text.length <= len) {
-      return text;
-    } else {
-      return text.substring(0, len) + '...';
-    }
+
+  export function truncateText(text, maxLength) {
+    if (text.length <= maxLength) return text;
+    return text.slice(0, maxLength) + '...';
   }
 
   export const escapeForMermaid = (text) => {
@@ -110,3 +108,93 @@ export function formatTimestamp(date) {
     link.click();
     document.body.removeChild(link);
   }
+
+
+  
+  export function splitByLength(text, length) {
+    const lines = [];
+    for (let i = 0; i < text.length; i += length) {
+      lines.push(text.slice(i, i + length));
+    }
+    return lines;
+  }
+  
+  export function parseCacheControl(cacheControlHeader) {
+    const directives = cacheControlHeader.split(',').map(directive => directive.trim());
+    const parsedDirectives = {};
+  
+    for (const directive of directives) {
+      const [key, value] = directive.split('=');
+      parsedDirectives[key] = value ? parseInt(value, 10) : true;
+    }
+    return parsedDirectives;
+  }
+  
+  export function isResponseCached(ageInSeconds, parsedCacheControl) {
+    if (ageInSeconds !== null) {
+      return true;
+    }
+    if (parsedCacheControl['no-cache'] || parsedCacheControl['no-store']) {
+      return false;
+    }
+    if (parsedCacheControl['max-age'] || parsedCacheControl['s-maxage']) {
+      return true;
+    }
+    return false;
+  }
+  
+  export function getCommunicationType(entry) {
+    const contentType = entry.response.content.mimeType;
+    if (!contentType) {
+      return 'Other';
+    } else if (contentType.includes('json') || contentType.includes('xml')) {
+      return 'Fetch/XHR';
+    } else if (contentType.includes('html')) {
+      return 'Doc';
+    } else if (contentType.includes('css')) {
+      return 'CSS';
+    } else if (contentType.includes('javascript')) {
+      return 'JS';
+    } else if (contentType.includes('font')) {
+      return 'Font';
+    } else if (contentType.includes('image')) {
+      return 'Img';
+    } else if (contentType.includes('audio') || contentType.includes('video')) {
+      return 'Media';
+    } else if (contentType.includes('manifest')) {
+      return 'Manifest';
+    } else if (entry._webSocketMessages) {
+      return 'WS';
+    } else if (contentType.includes('wasm')) {
+      return 'Wasm';
+    } else {
+      return 'Other';
+    }
+  }
+  
+  export function getTopDomain(domain) {
+    const parts = domain.split('.');
+    if (parts.length > 2) {
+      return parts.slice(-2).join('.');
+    }
+    return domain;
+  }
+
+export function aggregateData(entries, key) {
+  const aggregatedData = entries.reduce((acc, entry) => {
+    const value = entry[key].replace( /\//g , "\/" );
+    if (acc[value]) {
+      acc[value]++;
+    } else {
+      acc[value] = 1;
+    }
+    return acc;
+  }, {});
+
+  return Object.entries(aggregatedData).map(([name, value]) => ({ name, value }));
+}
+
+export function copyTextarea(elemId) {
+  var element = document.getElementById(elemId);
+  navigator.clipboard.writeText(element.value);
+}
