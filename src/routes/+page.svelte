@@ -6,7 +6,7 @@
   import { statusRanges, communicationTypes, httpMethods } from '$lib/constants';
 
   import { generateMermaidHeaderAndTitle, generateMermaidQueryString,generateMermaidPostData,generateMermaidRequestCookies, generateMermaidResponse, generateMermaidResponseCookies } from '$lib/sequenceDiagramGenerator';
-
+  import { generatePlantUMLHeaderAndTitle, generatePlantUMLQueryString, generatePlantUMLPostData, generatePlantUMLRequestCookies, generatePlantUMLResponse, generatePlantUMLResponseCookies} from '$lib/sequenceDiagramGenerator';
 
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
   import PieChart from '$lib/components/PieChart.svelte';
@@ -546,136 +546,55 @@ $: methodCounts = entries.reduce((acc, entry) => {
       }
     };
 
-    function generateMermaidSequence() {
-      if (!filteredEntries || filteredEntries.length === 0) {
-        return '';
-      }
-
-      let mermaidCode = generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNumber);
-
-      filteredEntries.forEach(entry => {
-        const truncatedPath = truncateText(entry.path, 70);
-        const requestArrow = `[${entry.method}] ${truncatedPath}`;
-        const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
-        
-
-        mermaidCode += `  Browser->>${entry.domain}: ${requestArrow}\n`;
-        if(addLifeline){
-          mermaidCode += `  activate ${entry.domain}\n`;
-        }
-        
-        mermaidCode += generateMermaidQueryString(entry, addRequestQueryString, truncateQueryStrings, truncateQueryStringsLength);
-        mermaidCode += generateMermaidPostData(entry, addRequestPostData, truncatePostData, truncatePostDataLength);
-        mermaidCode += generateMermaidRequestCookies(entry, addRequestCookies, truncateReqCookie, truncateReqCookieLength);
-        mermaidCode += generateMermaidResponse(entry, addLifeline);
-        mermaidCode += generateMermaidResponseCookies(entry, addResponseCookies, truncateResCookie, truncateResCookieLength);
-
-  });
-
-  return mermaidCode;
-}
-
-  function generatePlantUMLSequence() {
-
-    let plantUMLCode = '@startuml\n';
-
-    if (addTitle && sequenceTitle) {
-      //console.log(sequenceTitle);
-      plantUMLCode += `title: ${sequenceTitle}\n`;
+  function generateMermaidSequence() {
+    if (!filteredEntries || filteredEntries.length === 0) {
+      return '';
     }
-    if (addAutoNumber) {
-      plantUMLCode += "autonumber\n";
-    }
+
+    let mermaidCode = generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNumber);
 
     filteredEntries.forEach(entry => {
       const truncatedPath = truncateText(entry.path, 70);
       const requestArrow = `[${entry.method}] ${truncatedPath}`;
       const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
-
-      plantUMLCode += `Browser -> "${entry.domain}": ${requestArrow}\n`;
-
+      
+      mermaidCode += `  Browser->>${entry.domain}: ${requestArrow}\n`;
       if(addLifeline){
-        plantUMLCode += `activate "${entry.domain}"\n`;
-      }
-
-
-      //QueryString
-      if (addRequestQueryString && entry.requestQueryString.length > 0) {
-          let requestQueryStringString = '';
-          
-          if (truncateQueryStrings) {
-            requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, truncateQueryStringsLength)}: ${truncateText(Qstring.value, truncateQueryStringsLength)}`).join('\\n');
-            //console.log(requestQueryStringString);
-          } else {
-            requestQueryStringString = entry.requestQueryString.map(Qstring => {
-              const lines = splitByLength(`${Qstring.name}: ${Qstring.value}`, 50);
-              return lines.join('\\n');
-            }).join('\\n');
-          }
-          plantUMLCode += `note over "${entry.domain}": **[Query String]**\\n${requestQueryStringString}\n`;
-        }
-
-      // PostData
-      if (addRequestPostData && entry.requestPostData) {
-          let postDataString = '';
-
-          if (truncatePostData) {
-            postDataString = entry.requestPostData.params
-              ? entry.requestPostData.params.map(param => `${truncateText(param.name, truncatePostDataLength)}: ${truncateText(param.value, truncatePostDataLength)}`).join('\\n')
-              : truncateText(entry.requestPostData.text, truncatePostDataLength);
-          } else {
-            postDataString = entry.requestPostData.params
-              ? entry.requestPostData.params.map(param => {
-                  const lines = splitByLength(`${param.name}: ${param.value}`, 50);
-                  return lines.join('\\n');
-                }).join('\\n')
-              : splitByLength(entry.requestPostData.text, 50).join('\\n');
-          }
-          plantUMLCode += `note over "${entry.domain}": **[postData]** ${entry.requestPostData.mimeType}\\n${postDataString}\n`;
-        }
-
-      // Request Cookies
-      if (addRequestCookies && entry.requestCookies.length > 0) {
-          let cookieString = '';
-
-          if (truncateReqCookie) {
-            cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name, truncateReqCookieLength)}: ${truncateText(cookie.value, truncateReqCookieLength)}`).join('\\n');
-          } else {
-            cookieString = entry.requestCookies.map(cookie => {
-              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
-              return lines.join('\\n');
-            }).join('\\n');
-          }
-          plantUMLCode += `note over "${entry.domain}": **[Request Cookies]**\\n${cookieString}\n`;
-        }
-
-      if( entry.status >= 300 && entry.status <= 399){
-        plantUMLCode += `"${entry.domain}" --> Browser: ${responseArrow}\n`;
-      }else if( entry.status >= 400 && entry.status <= 599){
-        plantUMLCode += `"${entry.domain}" --> Browser !!: ${responseArrow}\n`;
-      }else{
-        plantUMLCode += `"${entry.domain}" -> Browser: ${responseArrow}\n`;
-      }
-
-      // Response Cookies
-      if (addResponseCookies && entry.responseCookies.length > 0) {
-          let cookieString = '';
-
-          if (truncateResCookie) {
-            cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, truncateResCookieLength)}: ${truncateText(cookie.value, truncateResCookieLength)}`).join('\\n');
-          } else {
-            cookieString = entry.responseCookies.map(cookie => {
-              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
-              return lines.join('\\n');
-            }).join('\\n');
-          }
-          plantUMLCode += `note over Browser: **[Response Cookies]**\\n${cookieString}\n`;
-        }
-
-      if(addLifeline){
-        plantUMLCode += `deactivate "${entry.domain}"\n`;
+        mermaidCode += `  activate ${entry.domain}\n`;
       }
       
+      mermaidCode += generateMermaidQueryString(entry, addRequestQueryString, truncateQueryStrings, truncateQueryStringsLength);
+      mermaidCode += generateMermaidPostData(entry, addRequestPostData, truncatePostData, truncatePostDataLength);
+      mermaidCode += generateMermaidRequestCookies(entry, addRequestCookies, truncateReqCookie, truncateReqCookieLength);
+      mermaidCode += generateMermaidResponse(entry, addLifeline);
+      mermaidCode += generateMermaidResponseCookies(entry, addResponseCookies, truncateResCookie, truncateResCookieLength);
+
+    });
+
+    return mermaidCode;
+  }
+
+  function generatePlantUMLSequence() {
+    if (!filteredEntries || filteredEntries.length === 0) {
+      return '';
+    }
+
+    let plantUMLCode = generatePlantUMLHeaderAndTitle(addTitle, sequenceTitle, addAutoNumber);
+
+    filteredEntries.forEach(entry => {
+      const truncatedPath = truncateText(entry.path, 70);
+      const requestArrow = `[${entry.method}] ${truncatedPath}`;
+
+      plantUMLCode += `Browser -> "${entry.domain}": ${requestArrow}\n`;
+      if (addLifeline) {
+        plantUMLCode += `activate "${entry.domain}"\n`;
+      }
+      
+      plantUMLCode += generatePlantUMLQueryString(entry, addRequestQueryString, truncateQueryStrings, truncateQueryStringsLength);
+      plantUMLCode += generatePlantUMLPostData(entry, addRequestPostData, truncatePostData, truncatePostDataLength);
+      plantUMLCode += generatePlantUMLRequestCookies(entry, addRequestCookies, truncateReqCookie, truncateReqCookieLength);
+      plantUMLCode += generatePlantUMLResponse(entry, addLifeline);
+      plantUMLCode += generatePlantUMLResponseCookies(entry, addResponseCookies, truncateResCookie, truncateResCookieLength);
     });
 
     plantUMLCode += '@enduml';
@@ -1229,7 +1148,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
 
           
 
-          <div id="buildTimestamp">Build ver.20240923040632</div>
+          <div id="buildTimestamp">Build ver.20241022045636</div>
         </div>
       </TabItem>
     </Tabs>
