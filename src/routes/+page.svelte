@@ -4,6 +4,10 @@
   
   import { getStatusCodeData, getMimeTypeData } from '$lib/chartUtils';
   import { statusRanges, communicationTypes, httpMethods } from '$lib/constants';
+
+  import { generateMermaidHeaderAndTitle, generateMermaidQueryString,generateMermaidPostData,generateMermaidRequestCookies, generateMermaidResponse, generateMermaidResponseCookies } from '$lib/sequenceDiagramGenerator';
+
+
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
   import PieChart from '$lib/components/PieChart.svelte';
   import { Fileupload, Input, Range, Label, Button, Toggle, Tabs, Badge, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
@@ -547,107 +551,29 @@ $: methodCounts = entries.reduce((acc, entry) => {
         return '';
       }
 
-      let mermaidCode = 'sequenceDiagram\n';
-      if (addTitle && sequenceTitle) {
-        //console.log(sequenceTitle);
-        mermaidCode += `title: ${sequenceTitle}\n`;
-      }
-      if (addAutoNumber) {
-        mermaidCode += "autonumber\n";
-      }
+      let mermaidCode = generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNumber);
 
       filteredEntries.forEach(entry => {
         const truncatedPath = truncateText(entry.path, 70);
         const requestArrow = `[${entry.method}] ${truncatedPath}`;
         const responseArrow = `${entry.status} - ${entry.responseMimeType}`;
+        
 
         mermaidCode += `  Browser->>${entry.domain}: ${requestArrow}\n`;
         if(addLifeline){
           mermaidCode += `  activate ${entry.domain}\n`;
         }
         
-        //QueryString
-        if (addRequestQueryString && entry.requestQueryString.length > 0) {
-          let requestQueryStringString = '';
-          
-          if (truncateQueryStrings) {
-            requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, truncateQueryStringsLength)}: ${truncateText(Qstring.value, truncateQueryStringsLength)}`).join('<br>');
-            console.log(requestQueryStringString);
-          } else {
-            requestQueryStringString = entry.requestQueryString.map(Qstring => {
-              const lines = splitByLength(`${Qstring.name}: ${Qstring.value}`, 50);
-              return lines.join('<br>');
-            }).join('<br>');
-          }
-          mermaidCode += `note over ${entry.domain}: [Query String]<br>${requestQueryStringString}\n`;
-        }
+        mermaidCode += generateMermaidQueryString(entry, addRequestQueryString, truncateQueryStrings, truncateQueryStringsLength);
+        mermaidCode += generateMermaidPostData(entry, addRequestPostData, truncatePostData, truncatePostDataLength);
+        mermaidCode += generateMermaidRequestCookies(entry, addRequestCookies, truncateReqCookie, truncateReqCookieLength);
+        mermaidCode += generateMermaidResponse(entry, addLifeline);
+        mermaidCode += generateMermaidResponseCookies(entry, addResponseCookies, truncateResCookie, truncateResCookieLength);
 
-        // PostData
-        if (addRequestPostData && entry.requestPostData) {
-          let postDataString = '';
+  });
 
-          if (truncatePostData) {
-            postDataString = entry.requestPostData.params
-              ? entry.requestPostData.params.map(param => `${truncateText(param.name, truncatePostDataLength)}: ${truncateText(param.value, truncatePostDataLength)}`).join('<br>')
-              : truncateText(entry.requestPostData.text, truncatePostDataLength);
-          } else {
-            postDataString = entry.requestPostData.params
-              ? entry.requestPostData.params.map(param => {
-                  const lines = splitByLength(`${param.name}: ${param.value}`, 50);
-                  return lines.join('<br>');
-                }).join('<br>')
-              : splitByLength(entry.requestPostData.text, 50).join('<br>');
-          }
-          mermaidCode += `note over ${entry.domain}: [postData] ${entry.requestPostData.mimeType}<br>${postDataString}\n`;
-        }
-        
-        // Request Cookies
-        if (addRequestCookies && entry.requestCookies.length > 0) {
-          let cookieString = '';
-
-          if (truncateReqCookie) {
-            cookieString = entry.requestCookies.map(cookie => `${truncateText(cookie.name, truncateReqCookieLength)}: ${truncateText(cookie.value, truncateReqCookieLength)}`).join('<br>');
-          } else {
-            cookieString = entry.requestCookies.map(cookie => {
-              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
-              return lines.join('<br>');
-            }).join('<br>');
-          }
-          mermaidCode += `note over ${entry.domain}: [Request Cookies]<br>${cookieString}\n`;
-        }
-
-        //mermaidCode += `  ${entry.domain}-->>Browser: ${responseArrow}\n`;
-        if( entry.status >= 300 && entry.status <= 399){
-          mermaidCode += `${entry.domain} -->> Browser: ${responseArrow}\n`;
-        }else if( entry.status >= 400 && entry.status <= 599){
-          mermaidCode += `${entry.domain} --x Browser: ${responseArrow}\n`;
-        }else{
-          mermaidCode += `${entry.domain} ->> Browser: ${responseArrow}\n`;
-        }
-
-        if(addLifeline){
-          mermaidCode += `  deactivate ${entry.domain}\n`;
-        }
-
-        // Response Cookies
-        if (addResponseCookies && entry.responseCookies.length > 0) {
-          let cookieString = '';
-
-          if (truncateResCookie) {
-            cookieString = entry.responseCookies.map(cookie => `${truncateText(cookie.name, truncateResCookieLength)}: ${truncateText(cookie.value, truncateResCookieLength)}`).join('<br>');
-          } else {
-            cookieString = entry.responseCookies.map(cookie => {
-              const lines = splitByLength(`${cookie.name}: ${cookie.value}`, 50);
-              return lines.join('<br>');
-            }).join('<br>');
-          }
-          mermaidCode += `note over Browser: [Response Cookies]<br>${cookieString}\n`;
-        }
-
-      });
-
-      return mermaidCode;
-    }
+  return mermaidCode;
+}
 
   function generatePlantUMLSequence() {
 
@@ -679,7 +605,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
           
           if (truncateQueryStrings) {
             requestQueryStringString = entry.requestQueryString.map(Qstring => `${truncateText(Qstring.name, truncateQueryStringsLength)}: ${truncateText(Qstring.value, truncateQueryStringsLength)}`).join('\\n');
-            console.log(requestQueryStringString);
+            //console.log(requestQueryStringString);
           } else {
             requestQueryStringString = entry.requestQueryString.map(Qstring => {
               const lines = splitByLength(`${Qstring.name}: ${Qstring.value}`, 50);
