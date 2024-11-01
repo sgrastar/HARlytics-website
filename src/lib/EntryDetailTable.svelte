@@ -1,6 +1,5 @@
 <script>
   import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes,formatGMTtoUTC, formatToLocalTime, formatPostDataValue, normalizePostData } from '$lib/utils';
-  import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline } from 'flowbite-svelte-icons';
   import { Radio } from 'flowbite-svelte';
 
   import EntryRow from '$lib/EntryRow_general.svelte';
@@ -13,52 +12,60 @@
   let viewMode = 'entry';
   let showByPage = false;
 
-let selectedEntryIndexes = new Set();
-let selectedTabs = new Map();
-let prevEntriesLength;  // 初期値を設定しない
+  // より詳細な一意の識別子を生成する関数（EntryRowと同じ関数）
+  const getEntryId = (entry) => {
+    return [
+        entry.pageref || 'no-page',  // ページ参照
+        entry.url,                   // URL
+        entry.timestamp,             // タイムスタンプ
+        entry.startedDateTime        // 開始時刻
+    ].join('|');
+  };
 
-// entriesの変更を監視するリアクティブステートメント
-$: {
-  // 初期化時またはentriesの長さが変化したときに実行
+  let selectedEntryIds = new Set();
+  let selectedTabs = new Map();
+  let prevEntriesLength;
+
+  $: {
   if (prevEntriesLength !== entries.length) {
-    selectedEntryIndexes.clear();
+      selectedEntryIds.clear();
     selectedTabs.clear();
     prevEntriesLength = entries.length;
-    // リアクティブな更新のためのトリガー
-    selectedEntryIndexes = selectedEntryIndexes;
+      selectedEntryIds = selectedEntryIds;
     selectedTabs = selectedTabs;
   }
-}
+  }
 
-// $: hasPagesInfo = entries.pages && entries.pages.length > 0;
-$: hasPagesInfo = pages && pages.length > 0;
-$: if (!hasPagesInfo && viewMode === 'page') {
+  $: hasPagesInfo = pages && pages.length > 0;
+  $: if (!hasPagesInfo && viewMode === 'page') {
     viewMode = 'entry';
   }
 
-function toggleEntryDetails(index) {
-  if (selectedEntryIndexes.has(index)) {
-    selectedEntryIndexes.delete(index);
-    selectedTabs.delete(index);
+  // IDベースのトグル関数
+  function toggleEntryDetails(entry) {
+    const entryId = getEntryId(entry);
+    if (selectedEntryIds.has(entryId)) {
+      selectedEntryIds.delete(entryId);
+      selectedTabs.delete(entryId);
   } else {
-    selectedEntryIndexes.add(index);
-    selectedTabs.set(index, 'Headers');
+      selectedEntryIds.add(entryId);
+      selectedTabs.set(entryId, 'Headers');
   }
-  selectedEntryIndexes = selectedEntryIndexes;
+    selectedEntryIds = selectedEntryIds;
   selectedTabs = selectedTabs;
-}
+  }
 
-function handleKeyDown(event, index) {
+  function handleKeyDown(event, entry) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault();
-    toggleEntryDetails(index);
+      toggleEntryDetails(entry);
+    }
   }
-}
 
-function selectTab(index, tab) {
-  selectedTabs.set(index, tab);
-  selectedTabs = selectedTabs;
-}
+ function selectTab(entryId, tab) {
+    selectedTabs.set(entryId, tab);
+    selectedTabs = selectedTabs;
+  }
 
   function isDisplayableValue(value) {
     console.log(value);
@@ -109,21 +116,6 @@ function selectTab(index, tab) {
     return [];
   }
 
-  function calculateStartTime(startDateTime, blockedTime) {
-    try {
-      const startDate = new Date(startDateTime);
-      if (blockedTime >= 0) {
-        // blockedTimeはミリ秒単位なので、その分を加算
-        const startTimeWithBlocked = new Date(startDate.getTime() + blockedTime);
-        return startTimeWithBlocked.toISOString().replace('T', ' ').slice(0, -5);
-      }
-      return startDate.toISOString().replace('T', ' ').slice(0, -5);
-    } catch (e) {
-      console.error('Error calculating start time:', e);
-      return 'Invalid Date';
-    }
-  }
-
   // バーの幅を計算する関数（最大100%を超えないように制限）
   function calculateBarWidth(timing, totalTime) {
     if (timing < 0) return 0;
@@ -145,23 +137,9 @@ function selectTab(index, tab) {
 
     return Math.min((left / totalTime) * 100, 100);
   }
-  </script>
-    
-    <!-- <div class="flex justify-end mb-4">
-      <div class="inline-flex rounded-md shadow-sm" role="group">
-        <button class="px-4 py-2 text-sm font-medium rounded-l-lg {!showByPage ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                on:click={() => showByPage = false}>
-          Entry View
-        </button>
-        <button class="px-4 py-2 text-sm font-medium rounded-r-lg {showByPage ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
-                on:click={() => showByPage = true}
-                disabled={!hasPagesInfo}>
-          Page View
-        </button>
-      </div>
-    </div> -->
+</script>
 
-    <div class="p-2">
+<div class="p-2">
       <div class="flex gap-3">
         <Radio bind:group={viewMode} value="entry" on:click={() => showByPage = false}>Entry View</Radio>
         {#if hasPagesInfo}
@@ -170,50 +148,15 @@ function selectTab(index, tab) {
           <Radio bind:group={viewMode} value="second" disabled>Page View</Radio>
         {/if}
       </div>
-    </div>
+</div>
 
-    <div class="request-detail-table">
+<div class="request-detail-table">
       {#if entries.length === 0}
         <p>No data to display.</p>
       {:else}
-      <!-- <div class="table-header">
-        <div class="path header-cell">Path</div>
-        <div class="domain header-cell">Domain</div>
-        <div class="method header-cell">Method</div>
-        <div class="status header-cell">Status</div>
-        <div class="type header-cell">Type</div>
-        <div class="mimetype header-cell">mimeType</div>
-        <div class="timestamp header-cell">Timestamp</div>
-        <div class="time header-cell">Time</div>
-        <div class="size header-cell">Size</div>
-        <div class="cached header-cell">isCached</div>
-        <div class="age header-cell">age</div>
-        <div class="dns header-cell">dns</div>
-        <div class="connect header-cell">connect</div>
-        <div class="ssl header-cell">ssl</div>
-        <div class="send header-cell">send</div>
-        <div class="wait header-cell">wait</div>
-        <div class="receive header-cell">receive</div>
-        <div class="sign">
-          <table>
-            <tr>
-              <td class="auth"><span title="Authorization Header">🅰</span></td>
-              <td class="postData"><span title="Post Data">🅿</span></td>
-              <td class="queryParameter"><span title="Query Parameter">🆀</span></td>
-              <td class="cookies"><span title="Set-Cookie">🅲</span></td>
-            </tr>
-          </table>
-        </div>
-      </div> -->
-    
       <div class="table-body">
-        <!-- {console.log(showByPage)} -->
-        <!-- {console.log(hasPagesInfo)} -->
-
         {#if showByPage && hasPagesInfo}
           {#each pages as page}
-          <!-- {console.log(page.title)} -->
-            <!-- ページヘッダー -->
             <div class="page-header">
               <div class="flex items-center px-2 py-1 bg-gray-100">
                 <div class="flex-grow font-medium" title="{page.title}">
@@ -254,48 +197,19 @@ function selectTab(index, tab) {
                 </table>
               </div>
             </div>
-  
-            <!-- ページに属するエントリー -->
-            <!-- {#each entries.filter(entry => entry.pageref === page.id) as entry, index}
+
+          {#each entries.filter(entry => entry.pageref === page.id) as entry}
             <EntryRow
               {entry}
-              {index}
-              isIndented={true}
-              {selectedEntryIndexes}
-              {isPathTruncated}
-              {isDomainTruncated}
-              {toggleEntryDetails}
-              {handleKeyDown}
-              {selectedTabs}
-              {selectTab}
-              {normalizeHeaders}
-              {normalizePostData}
-              {httpStatusCSSClass}
-              {formatTime}
-              {formatBytes}
-              {formatTimestamp}
-              {truncateText}
-              {formatGMTtoUTC}
-              {formatToLocalTime}
-              {calculateStartTime}
-            {calculateBarWidth}
-            {calculateBarLeft}
-            />
-            {/each} -->
-            {#each entries.filter(entry => entry.pageref === page.id) as entry, index}
-            <!-- {#each entries as entry, index} -->
-            <EntryRow
-              {entry}
-              {index}
               isIndented={false}
               hasPageInfo={true}
-              {selectedEntryIndexes}
+              selectedEntryIndexes={selectedEntryIds}
               {isPathTruncated}
               {isDomainTruncated}
-              {toggleEntryDetails}
-              {handleKeyDown}
+              toggleEntryDetails={() => toggleEntryDetails(entry)}
+              handleKeyDown={(e) => handleKeyDown(e, entry)}
               {selectedTabs}
-              {selectTab}
+              selectTab={(_, tab) => selectTab(entry._id || entry.url, tab)}
               {normalizeHeaders}
               {normalizePostData}
               {httpStatusCSSClass}
@@ -340,19 +254,18 @@ function selectTab(index, tab) {
             </div>
           </div>
 
-          {#each entries as entry, index}
+        {#each entries as entry}
           <EntryRow
             {entry}
-            {index}
             isIndented={false}
             hasPageInfo={false}
-            {selectedEntryIndexes}
+            selectedEntryIndexes={selectedEntryIds}
             {isPathTruncated}
             {isDomainTruncated}
-            {toggleEntryDetails}
-            {handleKeyDown}
+            toggleEntryDetails={() => toggleEntryDetails(entry)}
+            handleKeyDown={(e) => handleKeyDown(e, entry)}
             {selectedTabs}
-            {selectTab}
+            selectTab={(_, tab) => selectTab(entry._id || entry.url, tab)}
             {normalizeHeaders}
             {normalizePostData}
             {httpStatusCSSClass}
@@ -752,12 +665,12 @@ function selectTab(index, tab) {
   }
 
 
-
+*/
 .detail-row.indent{
     margin-left: 30px;
   } 
   :global(.table-header.indent){
     margin-left: 30px;
   }
-*/
+
       </style>

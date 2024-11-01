@@ -13,7 +13,7 @@
   import {estimateConnectionSpeed} from '$lib/estimateConnectionSpeed.js';
   import PieChart from '$lib/components/PieChart.svelte';
   import { Fileupload, Input, Range, Label, Button, Toggle, Tabs, Badge, TabItem, MultiSelect, Dropdown, DropdownItem, DropdownDivider, Search, Textarea, Checkbox, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, } from 'flowbite-svelte';
-  import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline } from 'flowbite-svelte-icons';
+  import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline,FileCsvOutline,DrawSquareOutline,ChartPieSolid, WindowOutline, BarsFromLeftOutline,  FilterSolid } from 'flowbite-svelte-icons';
   import mermaid from 'mermaid';
 
   let logFilename = '';
@@ -80,7 +80,11 @@
   let allStatusSelected = true;
 
   let selectedTypes = [...communicationTypes];
+  
+  //For Display Cookie 
   let selectedValues = new Set();
+
+  
 
   //mermaid.initialize({ startOnLoad: false });
 
@@ -314,32 +318,47 @@
     return requestPostData;
   }
 
+  $: isMethodFiltered = !allMethodsSelected;
+  $: isStatusFiltered = !allStatusSelected;
+  $: isTypeFiltered = !allSelected;
 
+  // ボタンのスタイルを動的に設定
+  $: methodFilterStyle = isMethodFiltered ? 
+    "primary" : // オレンジ背景、白文字
+    "light";    // 灰色背景、黒文字
+
+  $: statusFilterStyle = isStatusFiltered ? 
+    "primary" : 
+    "light";
+
+  $: typeFilterStyle = isTypeFiltered ? 
+    "primary" : 
+    "light";
 
   
- $: filteredEntries = entries.filter(entry => {
-  const domain_path = entry.domain + entry.path;
-  const url = domain_path.toLowerCase();
-  const urlFilters = urlFilter.split(',').map(filter => filter.trim().toLowerCase());
+  $: filteredEntries = entries.filter(entry => {
+    const domain_path = entry.domain + entry.path;
+    const url = domain_path.toLowerCase();
+    const urlFilters = urlFilter.split(',').map(filter => filter.trim().toLowerCase());
 
-  const matchesUrlFilter = urlFilters.every(filter => {
-    if (filter.startsWith('-')) {
-      return !url.includes(filter.slice(1));
-    } else {
-      return filter === '' || url.includes(filter);
-    }
+    const matchesUrlFilter = urlFilters.every(filter => {
+      if (filter.startsWith('-')) {
+        return !url.includes(filter.slice(1));
+      } else {
+        return filter === '' || url.includes(filter);
+      }
+    });
+
+    const matchesTypeFilter = selectedTypes.length === 0 ? false : selectedTypes.includes(entry.type);
+    const matchesStatusFilter = selectedStatusRanges.some(range =>
+      (range.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
+      (entry.status >= range.min && entry.status <= range.max)
+    );
+    const matchesDomainFilter = selectedDomains.length === 0 || selectedDomains.includes(entry.domain);
+    const matchesMethodFilter = selectedMethods.length === 0 ? false : selectedMethods.includes(entry.method);
+
+    return matchesUrlFilter && matchesTypeFilter && matchesStatusFilter && matchesDomainFilter && matchesMethodFilter;
   });
-
-  const matchesTypeFilter = selectedTypes.length === 0 || selectedTypes.includes(entry.type);
-  const matchesStatusFilter = selectedStatusRanges.some(range =>
-    (range.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
-    (entry.status >= range.min && entry.status <= range.max)
-  );
-  const matchesDomainFilter = selectedDomains.length === 0 || selectedDomains.includes(entry.domain);
-  const matchesMethodFilter = selectedMethods.length > 0 && selectedMethods.includes(entry.method);
-
-  return matchesUrlFilter && matchesTypeFilter && matchesStatusFilter && matchesDomainFilter && matchesMethodFilter;
-});
 
   //$: allValueNames = new Set(entries.flatMap(entry => entry.values.map(value => value.name)));
   //$: valueNames = new Set(filteredEntries.flatMap(entry => entry.values.map(value => value.name)));
@@ -451,6 +470,65 @@
     );
   }
 
+ // ドロップダウンの表示状態を管理
+ let methodDropdownOpen = false;
+  let statusDropdownOpen = false;
+  let typeDropdownOpen = false;
+  
+  // ホバー状態とクリック状態を管理するタイマー
+  let methodTimer;
+  let statusTimer;
+  let typeTimer;
+  
+  // マウスが離れてからドロップダウンを閉じるまでの遅延時間（ミリ秒）
+  const CLOSE_DELAY = 200;
+
+  function handleMouseEnter(type) {
+    clearTimeout(methodTimer);
+    clearTimeout(statusTimer);
+    clearTimeout(typeTimer);
+    
+    switch (type) {
+      case 'method':
+        methodDropdownOpen = true;
+        break;
+      case 'status':
+        statusDropdownOpen = true;
+        break;
+      case 'type':
+        typeDropdownOpen = true;
+        break;
+    }
+  }
+
+  function handleMouseLeave(type) {
+    const timer = setTimeout(() => {
+      switch (type) {
+        case 'method':
+          methodDropdownOpen = false;
+          break;
+        case 'status':
+          statusDropdownOpen = false;
+          break;
+        case 'type':
+          typeDropdownOpen = false;
+          break;
+      }
+    }, CLOSE_DELAY);
+
+    switch (type) {
+      case 'method':
+        methodTimer = timer;
+        break;
+      case 'status':
+        statusTimer = timer;
+        break;
+      case 'type':
+        typeTimer = timer;
+        break;
+    }
+  }
+
 function handleStatusRangeClick(statusRange) {
     if (selectedStatusRanges.includes(statusRange)) {
       selectedStatusRanges = selectedStatusRanges.filter(range => range !== statusRange);
@@ -469,6 +547,14 @@ function handleStatusRangeClick(statusRange) {
     }
   }
 
+  // function handleTypeClick(type) {
+  //   if (selectedTypes.includes(type)) {
+  //     selectedTypes = selectedTypes.filter(t => t !== type);
+  //   } else {
+  //     selectedTypes = [...selectedTypes, type];
+  //   }
+  //   allSelected = selectedTypes.length === communicationTypes.length;
+  // }
   function handleTypeClick(type) {
     if (selectedTypes.includes(type)) {
       selectedTypes = selectedTypes.filter(t => t !== type);
@@ -478,8 +564,16 @@ function handleStatusRangeClick(statusRange) {
     allSelected = selectedTypes.length === communicationTypes.length;
   }
 
+  // function handleAllChange(event) {
+  //     allSelected = event.target.checked;
+  //   if (allSelected) {
+  //     selectedTypes = [...communicationTypes];
+  //   } else {
+  //     selectedTypes = [];
+  //   }
+  // }
   function handleAllChange(event) {
-      allSelected = event.target.checked;
+    allSelected = event.target.checked;
     if (allSelected) {
       selectedTypes = [...communicationTypes];
     } else {
@@ -670,88 +764,143 @@ $: methodCounts = entries.reduce((acc, entry) => {
             <Label for="urlFilter">URL Filters (any match):</Label>
             <Search type="text" id="urlFilter" bind:value={urlFilter} on:input={handleFilterInput} placeholder="comma-separated, use '-' to exclude" size="sm"/>
           </div>
-          <!--
-          <div class="col-span-6 ml-2">
-            <Label for="notUrlFilter">Exclude URLs containing (separate by commas):</Label>
-            <Input type="text" id="notUrlFilter" bind:value={notUrlFilter} on:input={handleFilterInput}  size="sm"/>
-          </div>-->
-
-          <div class="col-span-2 ml-2">
-            <Button size="sm" class="w-full">
+          
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
+          <div class="relative inline-block col-span-2 ml-2"
+            on:mouseenter={() => handleMouseEnter('method')}
+            on:mouseleave={() => handleMouseLeave('method')}>
+            <Button color={methodFilterStyle} size="sm" class="w-full">
+              {#if isMethodFiltered}
+                <FilterSolid class="w-3 h-3 mr-1" />
+              {/if}
               HTTP Method Filter
-              <ChevronDownOutline class="w-3 h-3 ml-2 text-white dark:text-white" />
-            </Button>
-            
-            <Dropdown class="w-50 p-3 space-y-3 text-sm">
-              <div slot="header" class="px-4 py-2">
-                <div class="flex items-center">
-                  <Toggle class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
-                  size="small" bind:checked={allMethodsSelected} on:change={handleAllMethodsChange}>All</Toggle>
-                </div>
-              </div>
-              <DropdownDivider />
-              {#each httpMethods as method}
-                <li class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
-                  <Checkbox checked={selectedMethods.includes(method)} on:click={() => handleMethodClick(method)}>
-  {method} ({filteredEntries.filter(entry => entry.method === method).length}/{methodCounts[method] || 0})
-</Checkbox>
-                </li>
-              {/each}
-            </Dropdown>
-          </div>
-
-          <div class="col-span-2 ml-2">
-            <Button size="sm" class="w-full">
-              HTTP Status Filter
-              <ChevronDownOutline class="w-3 h-3 ml-2 text-white dark:text-white" />
-            </Button>
-            
-            <Dropdown class="w-44 p-3 space-y-3 text-sm">
-              <div slot="header" class="px-4 py-2">
-                <div class="flex items-center">
-                  <Toggle class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
-                  size="small" bind:checked={allStatusSelected} on:change={handleAllStatusChange}>All</Toggle>
-                </div>
-              </div>
-              <DropdownDivider />
-              {#each statusRanges as statusRange}
-                <li class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
-                  <Checkbox checked={selectedStatusRanges.includes(statusRange)} on:click={() => handleStatusRangeClick(statusRange)}>
-                    {statusRange.label} ({filteredEntries.filter(entry =>
-                      (statusRange.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
-                      (entry.status >= statusRange.min && entry.status <= statusRange.max)
-                    ).length}/{statusCounts[statusRange.label] || 0})
-                  </Checkbox>
-                </li>
-              {/each}
-            </Dropdown>
-          </div>
-          
-          <div class="col-span-2 ml-2">
-            <Button size="sm" class="w-full">
-              mimeType Filter
-              <ChevronDownOutline class="w-3 h-3 ml-2 text-white dark:text-white" />
-            </Button>
-            
-            <Dropdown class="w-48 p-3 space-y-3 text-sm">
-              <div slot="header" class="px-4 py-2">
-                <div class="flex items-center">
-                  <Toggle  class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
-                   size="small" bind:checked={allSelected} on:change={handleAllChange}>All</Toggle>
-                </div>
-              </div>
+              <ChevronDownOutline class="w-3 h-3 ml-2" />
               
-              {#each communicationTypes as type}
-                <li class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
-                  <Checkbox checked={selectedTypes.includes(type)} on:click={() => handleTypeClick(type)}>
-                    {type} ({filteredEntries.filter(entry => entry.type === type).length}/{typeCounts[type] || 0})
-                  </Checkbox>
-                </li>
-              {/each}
-            </Dropdown>
+            </Button>
+          
+            {#if methodDropdownOpen}
+              <div class="absolute z-50 w-50">
+                <div class="bg-white rounded shadow dark:bg-gray-800 p-3 space-y-3 text-sm">
+                  <div class="px-4 py-2">
+                    <div class="flex items-center">
+                      <Toggle 
+                        class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
+                        size="small" 
+                        bind:checked={allMethodsSelected} 
+                        on:change={handleAllMethodsChange}>
+                        All
+                      </Toggle>
+                    </div>
+                  </div>
+                  <DropdownDivider />
+                  {#each httpMethods as method}
+                    <div class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
+                      <Checkbox 
+                        checked={selectedMethods.includes(method)} 
+                        on:click={() => handleMethodClick(method)}>
+                        {method} ({filteredEntries.filter(entry => entry.method === method).length}/{methodCounts[method] || 0})
+                      </Checkbox>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </div>
+          
+
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
+          <div class="relative inline-block col-span-2 ml-2"
+              on:mouseenter={() => handleMouseEnter('status')}
+              on:mouseleave={() => handleMouseLeave('status')}>
+              <Button color={statusFilterStyle} size="sm" class="w-full">
+                {#if isStatusFiltered}
+                  <FilterSolid class="w-3 h-3 mr-1" />
+                {/if}
+                HTTP Status Filter
+                <ChevronDownOutline class="w-3 h-3 ml-2" />
+                
+              </Button>
+
+              {#if statusDropdownOpen}
+                <div class="absolute z-50 w-50">
+                  <div class="bg-white rounded shadow dark:bg-gray-800 p-3 space-y-3 text-sm">
+                    <div class="px-4 py-2">
+                      <div class="flex items-center">
+                        <Toggle 
+                          class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
+                          size="small" 
+                          bind:checked={allStatusSelected} 
+                          on:change={handleAllStatusChange}>
+                          All
+                        </Toggle>
+                      </div>
+                    </div>
+                    <DropdownDivider />
+                    {#each statusRanges as statusRange}
+                      <div class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <Checkbox 
+                          checked={selectedStatusRanges.includes(statusRange)} 
+                          on:click={() => handleStatusRangeClick(statusRange)}>
+                          {statusRange.label} ({filteredEntries.filter(entry =>
+                            (statusRange.other && (entry.status < 100 || entry.status >= 600 || isNaN(entry.status))) ||
+                            (entry.status >= statusRange.min && entry.status <= statusRange.max)
+                          ).length}/{statusCounts[statusRange.label] || 0})
+                        </Checkbox>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+          
+
+            <!-- svelte-ignore a11y-no-static-element-interactions -->
+            <div class="relative inline-block col-span-2 ml-2"
+              on:mouseenter={() => handleMouseEnter('type')}
+              on:mouseleave={() => handleMouseLeave('type')}>
+              <Button color={typeFilterStyle} size="sm" class="w-full">
+                {#if isTypeFiltered}
+                  <FilterSolid class="w-3 h-3 mr-1" />
+                {/if}
+                mimeType Filter
+                <ChevronDownOutline class="w-3 h-3 ml-2" />
+                
+              </Button>
+
+              {#if typeDropdownOpen}
+                <div class="absolute z-50 w-50">
+                  <div class="bg-white rounded shadow dark:bg-gray-800 p-3 space-y-3 text-sm">
+                    <div class="px-4 py-2">
+                      <div class="flex items-center">
+                        <Toggle 
+                          class="rounded p-2 hover:bg-gray-100 dark:hover:bg-gray-600"
+                          size="small" 
+                          bind:checked={allSelected} 
+                          on:change={handleAllChange}>
+                          All
+                        </Toggle>
+                      </div>
+                    </div>
+                    <DropdownDivider />
+                    {#each communicationTypes as type}
+                      <div class="rounded p-1 hover:bg-gray-100 dark:hover:bg-gray-600">
+                        <Checkbox 
+                          checked={selectedTypes.includes(type)} 
+                          on:click={() => handleTypeClick(type)}>
+                          {type} ({filteredEntries.filter(entry => entry.type === type).length}/{typeCounts[type] || 0})
+                        </Checkbox>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
+            </div>
+            
+          <!-- </div> -->
 
           
+        
+        
         </div>
       </div>
 
@@ -1199,6 +1348,17 @@ $: methodCounts = entries.reduce((acc, entry) => {
     height: 4.2em;
     overflow: auto;
   }
+
+  .relative.inline-block {
+  margin-right: 0.5rem; /* フィルター間の間隔 */
+}
+
+/* ドロップダウンの位置調整が必要な場合 */
+.absolute {
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+}
 
   #analyzeCookieDisplay{
     height: 53vh;
