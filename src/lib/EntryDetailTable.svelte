@@ -1,0 +1,763 @@
+<script>
+  import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes,formatGMTtoUTC, formatToLocalTime, formatPostDataValue, normalizePostData } from '$lib/utils';
+  import { ChevronDownOutline, ChevronDoubleRightOutline, ChevronDoubleLeftOutline } from 'flowbite-svelte-icons';
+  import { Radio } from 'flowbite-svelte';
+
+  import EntryRow from '$lib/EntryRow_general.svelte';
+  
+  export let entries = [];
+  export let pages = [];
+  export let isPathTruncated = true;
+  export let isDomainTruncated = true;
+
+  let viewMode = 'entry';
+  let showByPage = false;
+
+let selectedEntryIndexes = new Set();
+let selectedTabs = new Map();
+let prevEntriesLength;  // 初期値を設定しない
+
+// entriesの変更を監視するリアクティブステートメント
+$: {
+  // 初期化時またはentriesの長さが変化したときに実行
+  if (prevEntriesLength !== entries.length) {
+    selectedEntryIndexes.clear();
+    selectedTabs.clear();
+    prevEntriesLength = entries.length;
+    // リアクティブな更新のためのトリガー
+    selectedEntryIndexes = selectedEntryIndexes;
+    selectedTabs = selectedTabs;
+  }
+}
+
+// $: hasPagesInfo = entries.pages && entries.pages.length > 0;
+$: hasPagesInfo = pages && pages.length > 0;
+$: if (!hasPagesInfo && viewMode === 'page') {
+    viewMode = 'entry';
+  }
+
+function toggleEntryDetails(index) {
+  if (selectedEntryIndexes.has(index)) {
+    selectedEntryIndexes.delete(index);
+    selectedTabs.delete(index);
+  } else {
+    selectedEntryIndexes.add(index);
+    selectedTabs.set(index, 'Headers');
+  }
+  selectedEntryIndexes = selectedEntryIndexes;
+  selectedTabs = selectedTabs;
+}
+
+function handleKeyDown(event, index) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    toggleEntryDetails(index);
+  }
+}
+
+function selectTab(index, tab) {
+  selectedTabs.set(index, tab);
+  selectedTabs = selectedTabs;
+}
+
+  function isDisplayableValue(value) {
+    console.log(value);
+    return value !== null && 
+          value !== undefined && 
+          typeof value !== 'object' && 
+          !ArrayBuffer.isView(value);
+  }
+
+  function formatHeaderValue(value) {
+    console.log(value);
+    if (!isDisplayableValue(value)) {
+      if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
+        return '[Binary Data]';
+      }
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value);
+        } catch {
+          return '[Complex Object]';
+        }
+      }
+      return '[Unknown Data Type]';
+    }
+    return String(value);
+  }
+
+  // ヘッダーをイテラブルな配列に変換する関数
+  function normalizeHeaders(headers) {
+    if (!headers) return [];
+    if (Array.isArray(headers)) {
+      return headers.filter(header => {
+        const headerName = header.name.toLowerCase();
+        return headerName !== 'cookie' && headerName !== 'set-cookie';
+      });
+    }
+    if (typeof headers === 'object') {
+      return Object.entries(headers)
+        .filter(([name]) => {
+          const headerName = name.toLowerCase();
+          return headerName !== 'cookie' && headerName !== 'set-cookie';
+        })
+        .map(([name, value]) => ({
+          name,
+          value: formatHeaderValue(value)
+        }));
+    }
+    return [];
+  }
+
+  function calculateStartTime(startDateTime, blockedTime) {
+    try {
+      const startDate = new Date(startDateTime);
+      if (blockedTime >= 0) {
+        // blockedTimeはミリ秒単位なので、その分を加算
+        const startTimeWithBlocked = new Date(startDate.getTime() + blockedTime);
+        return startTimeWithBlocked.toISOString().replace('T', ' ').slice(0, -5);
+      }
+      return startDate.toISOString().replace('T', ' ').slice(0, -5);
+    } catch (e) {
+      console.error('Error calculating start time:', e);
+      return 'Invalid Date';
+    }
+  }
+
+  // バーの幅を計算する関数（最大100%を超えないように制限）
+  function calculateBarWidth(timing, totalTime) {
+    if (timing < 0) return 0;
+    const percentage = (timing / totalTime) * 100;
+    return Math.min(percentage, 100);
+  }
+
+  // バーの開始位置を計算する関数（最大100%を超えないように制限）
+  function calculateBarLeft(timings, phase, totalTime) {
+    let left = 0;
+    const phases = ['blocked', 'dns', 'connect', 'ssl', 'send', 'wait', 'receive'];
+    const phaseIndex = phases.indexOf(phase);
+
+    for (let i = 0; i < phaseIndex; i++) {
+      if (timings[phases[i]] >= 0) {
+        left += timings[phases[i]];
+      }
+    }
+
+    return Math.min((left / totalTime) * 100, 100);
+  }
+  </script>
+    
+    <!-- <div class="flex justify-end mb-4">
+      <div class="inline-flex rounded-md shadow-sm" role="group">
+        <button class="px-4 py-2 text-sm font-medium rounded-l-lg {!showByPage ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                on:click={() => showByPage = false}>
+          Entry View
+        </button>
+        <button class="px-4 py-2 text-sm font-medium rounded-r-lg {showByPage ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}"
+                on:click={() => showByPage = true}
+                disabled={!hasPagesInfo}>
+          Page View
+        </button>
+      </div>
+    </div> -->
+
+    <div class="p-2">
+      <div class="flex gap-3">
+        <Radio bind:group={viewMode} value="entry" on:click={() => showByPage = false}>Entry View</Radio>
+        {#if hasPagesInfo}
+          <Radio bind:group={viewMode} value="page" on:click={() => showByPage = true}>Page View</Radio>
+        {:else}
+          <Radio bind:group={viewMode} value="second" disabled>Page View</Radio>
+        {/if}
+      </div>
+    </div>
+
+    <div class="request-detail-table">
+      {#if entries.length === 0}
+        <p>No data to display.</p>
+      {:else}
+      <!-- <div class="table-header">
+        <div class="path header-cell">Path</div>
+        <div class="domain header-cell">Domain</div>
+        <div class="method header-cell">Method</div>
+        <div class="status header-cell">Status</div>
+        <div class="type header-cell">Type</div>
+        <div class="mimetype header-cell">mimeType</div>
+        <div class="timestamp header-cell">Timestamp</div>
+        <div class="time header-cell">Time</div>
+        <div class="size header-cell">Size</div>
+        <div class="cached header-cell">isCached</div>
+        <div class="age header-cell">age</div>
+        <div class="dns header-cell">dns</div>
+        <div class="connect header-cell">connect</div>
+        <div class="ssl header-cell">ssl</div>
+        <div class="send header-cell">send</div>
+        <div class="wait header-cell">wait</div>
+        <div class="receive header-cell">receive</div>
+        <div class="sign">
+          <table>
+            <tr>
+              <td class="auth"><span title="Authorization Header">🅰</span></td>
+              <td class="postData"><span title="Post Data">🅿</span></td>
+              <td class="queryParameter"><span title="Query Parameter">🆀</span></td>
+              <td class="cookies"><span title="Set-Cookie">🅲</span></td>
+            </tr>
+          </table>
+        </div>
+      </div> -->
+    
+      <div class="table-body">
+        <!-- {console.log(showByPage)} -->
+        <!-- {console.log(hasPagesInfo)} -->
+
+        {#if showByPage && hasPagesInfo}
+          {#each pages as page}
+          <!-- {console.log(page.title)} -->
+            <!-- ページヘッダー -->
+            <div class="page-header">
+              <div class="flex items-center px-2 py-1 bg-gray-100">
+                <div class="flex-grow font-medium" title="{page.title}">
+                  {truncateText(page.title, 100) || `Page ${page.id}`} 
+                  <span class="text-sm text-gray-600">
+                    <!-- (Load: {formatTime(page.pageTimings.onLoad)}) -->
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-header indent">
+              <div class="path header-cell">Path</div>
+              <div class="domain header-cell">Domain</div>
+              <div class="method header-cell">Method</div>
+              <div class="status header-cell">Status</div>
+              <div class="type header-cell">Type</div>
+              <div class="mimetype header-cell">mimeType</div>
+              <div class="timestamp header-cell">Timestamp</div>
+              <div class="time header-cell">Time</div>
+              <div class="size header-cell">Size</div>
+              <div class="cached header-cell">isCached</div>
+              <div class="age header-cell">age</div>
+              <div class="dns header-cell">dns</div>
+              <div class="connect header-cell">connect</div>
+              <div class="ssl header-cell">ssl</div>
+              <div class="send header-cell">send</div>
+              <div class="wait header-cell">wait</div>
+              <div class="receive header-cell">receive</div>
+              <div class="sign">
+                <table>
+                  <tr>
+                    <td class="auth"><span title="Authorization Header">🅰</span></td>
+                    <td class="postData"><span title="Post Data">🅿</span></td>
+                    <td class="queryParameter"><span title="Query Parameter">🆀</span></td>
+                    <td class="cookies"><span title="Set-Cookie">🅲</span></td>
+                  </tr>
+                </table>
+              </div>
+            </div>
+  
+            <!-- ページに属するエントリー -->
+            <!-- {#each entries.filter(entry => entry.pageref === page.id) as entry, index}
+            <EntryRow
+              {entry}
+              {index}
+              isIndented={true}
+              {selectedEntryIndexes}
+              {isPathTruncated}
+              {isDomainTruncated}
+              {toggleEntryDetails}
+              {handleKeyDown}
+              {selectedTabs}
+              {selectTab}
+              {normalizeHeaders}
+              {normalizePostData}
+              {httpStatusCSSClass}
+              {formatTime}
+              {formatBytes}
+              {formatTimestamp}
+              {truncateText}
+              {formatGMTtoUTC}
+              {formatToLocalTime}
+              {calculateStartTime}
+            {calculateBarWidth}
+            {calculateBarLeft}
+            />
+            {/each} -->
+            {#each entries.filter(entry => entry.pageref === page.id) as entry, index}
+            <!-- {#each entries as entry, index} -->
+            <EntryRow
+              {entry}
+              {index}
+              isIndented={false}
+              hasPageInfo={true}
+              {selectedEntryIndexes}
+              {isPathTruncated}
+              {isDomainTruncated}
+              {toggleEntryDetails}
+              {handleKeyDown}
+              {selectedTabs}
+              {selectTab}
+              {normalizeHeaders}
+              {normalizePostData}
+              {httpStatusCSSClass}
+              {formatTime}
+              {formatBytes}
+              {truncateText}
+              {formatGMTtoUTC}
+              {formatToLocalTime}
+              {calculateBarWidth}
+              {calculateBarLeft}
+            />
+            {/each}
+          {/each}
+        {:else}
+          <div class="table-header">
+            <div class="path header-cell">Path</div>
+            <div class="domain header-cell">Domain</div>
+            <div class="method header-cell">Method</div>
+            <div class="status header-cell">Status</div>
+            <div class="type header-cell">Type</div>
+            <div class="mimetype header-cell">mimeType</div>
+            <div class="timestamp header-cell">Timestamp</div>
+            <div class="time header-cell">Time</div>
+            <div class="size header-cell">Size</div>
+            <div class="cached header-cell">isCached</div>
+            <div class="age header-cell">age</div>
+            <div class="dns header-cell">dns</div>
+            <div class="connect header-cell">connect</div>
+            <div class="ssl header-cell">ssl</div>
+            <div class="send header-cell">send</div>
+            <div class="wait header-cell">wait</div>
+            <div class="receive header-cell">receive</div>
+            <div class="sign">
+              <table>
+                <tr>
+                  <td class="auth"><span title="Authorization Header">🅰</span></td>
+                  <td class="postData"><span title="Post Data">🅿</span></td>
+                  <td class="queryParameter"><span title="Query Parameter">🆀</span></td>
+                  <td class="cookies"><span title="Set-Cookie">🅲</span></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          {#each entries as entry, index}
+          <EntryRow
+            {entry}
+            {index}
+            isIndented={false}
+            hasPageInfo={false}
+            {selectedEntryIndexes}
+            {isPathTruncated}
+            {isDomainTruncated}
+            {toggleEntryDetails}
+            {handleKeyDown}
+            {selectedTabs}
+            {selectTab}
+            {normalizeHeaders}
+            {normalizePostData}
+            {httpStatusCSSClass}
+            {formatTime}
+            {formatBytes}
+            {truncateText}
+            {formatGMTtoUTC}
+            {formatToLocalTime}
+            {calculateBarWidth}
+            {calculateBarLeft}
+          />
+          {/each}
+        {/if}
+      </div>
+      {/if}
+    </div>
+    
+    <style>
+      .request-detail-table {
+        width: 100%;
+        /* overflow-x: auto; */
+        font-size: 0.8rem;
+      }
+      
+      .table-header {
+        display: flex;
+        position: sticky;
+        top: 0;
+        background: #f2f2f2;
+        border-bottom: 1px solid #ccc;
+        z-index: 1;
+        padding:0 .5rem;
+      }
+
+      .table-header.indent{
+        top: 29px;
+      }
+      
+      .table-body {
+        display: flex;
+        flex-direction: column;
+      }
+      
+      .table-row {
+        display: flex;
+        border-bottom: 1px solid #eee;
+      }
+      
+      .header-cell, .cell {
+        padding: 3px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      
+      .header-cell {
+        font-weight: bold;
+      }
+      
+      .path { width: 250px; }
+      .domain { width: 210px; }
+      .type { width: 80px; text-align: center;}
+      .mimetype { width: 150px; }
+      .status { width: 60px; text-align: center; }
+      .method { width: 70px; text-align: center; }
+      .timestamp { width: 150px; }
+      .cookies { width: 60px; text-align: right; }
+      .time { width: 70px; text-align: right; }
+      .size { width: 70px; text-align: right; }
+      .cached { width: 60px; text-align: center; }
+      .age { width: 60px; text-align: right; }
+      .dns { width: 60px; text-align: right; }
+      .connect { width: 60px; text-align: right; }
+      .ssl { width: 60px; text-align: right; }
+      .send { width: 60px; text-align: right; }
+      .wait { width: 60px; text-align: right; }
+      .receive { width: 60px; text-align: right; }
+
+      .sign table td{
+        font-size: 100%;
+        font-weight: bold;
+        width: 1.2em;
+      }
+      .sign table td.auth,
+      .sign table td.postData{
+        color: red;
+      }
+      .sign table td.queryParameter,
+      .sign table td.cookies{
+        color: green;
+      }
+      
+      /* .status.info,
+      .status.success {
+        background: #99ffa2;
+      }
+      
+      .status.redirect {
+        background: #eaff99;
+      }
+      
+      .status.cliError {
+        background: rgb(255, 153, 161);
+      }
+      
+      .status.srvError {
+        background: #ff4554;
+        color: #fff;
+      }
+      
+      .detail-row {
+        border-bottom: 1px solid #eee;
+        box-shadow: 0px 0px 2px 0px inset #999;
+        margin: 0 0 10px 10px;
+        border-bottom-left-radius: 20px;
+        border-bottom-right-radius: 10px;
+      }
+      
+      .table-row:hover {
+        background-color: rgba(0, 0, 0, 0.02);
+      } */
+      
+      /* .table-row.selected {
+        background-color: rgba(0, 0, 0, 0.05);
+      } */
+      /* .table-row.selected {
+        /* box-shadow: 2px 2px 4px -2px #666 */
+        /* box-shadow: 4px 3px 10px -3px #666;
+      } */
+      
+      /* .table-row:focus {
+        outline: 1px solid #023480;
+        outline-offset: -2px;
+      }  */
+      
+      /* .header-cell button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 2px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      } */
+/*       
+      .custom-tabs {
+        background-color: #f8f9fa;
+
+        margin: 10px 0 10px 20px;
+        width: 90%;
+      }
+      
+      .tab-list {
+        display: flex;
+        border-bottom: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+        height: 24px;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+      
+      .tab-button {
+        padding: 2px 8px;
+        background: none;
+        border: none;
+        font-size: 0.75rem;
+        color: #6c757d;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        white-space: nowrap;
+      }
+      
+      .tab-button:hover {
+        color: #495057;
+      }
+      
+      .tab-button.active {
+        color: #0d6efd;
+        border-bottom-color: #0d6efd;
+      } */
+/*       
+      .tab-content {
+        padding: 8px;
+        font-size: 0.75rem;
+       
+        overflow-y: auto;
+      }
+
+
+      .header-general{
+        margin-bottom: 10px;
+      }
+      .header-general table{
+        width: 100%;
+      }
+      
+      .header-general th{
+        text-align: right;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0 4px;
+        width: 200px;
+      }
+      .header-general td{
+        text-align: left;
+        border-bottom: 1px solid #e5e7eb;
+        padding: 0 4px;
+        word-break: break-all;
+      }
+
+.headers-container,
+.payload-container,
+.cookies-container {
+  font-size: 0.75rem;
+  margin: -4px 0;
+}
+
+.header-sections-wrapper,
+.payload-sections-wrapper,
+.cookies-sections-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+} */
+
+/* 980px以上の場合のスタイル */
+/* @media (min-width: 980px) {
+  .header-sections-wrapper {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  
+  .header-section {
+    flex: 1;
+    min-width: 0;
+  }
+
+  
+
+  .header-section:first-child {
+    margin-right: 4px;
+  }
+  
+  .header-section:last-child {
+    margin-left: 4px;
+  }
+}
+
+.header-title,
+.payload-title,
+.cookies-title {
+  font-weight: 600;
+  color: #1a1a1a;
+  padding: 2px 0;
+} */
+/* 
+.header-table,
+.cookies-table {
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.header-table .table-header {
+  display: flex;
+  background-color: #f3f4f6;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.header-table .table-row {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.header-table .table-row:last-child {
+  border-bottom: none;
+}
+
+.name-col {
+  width: 200px;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: bold;
+  text-align: right;
+}
+
+.value-col {
+  flex: 1;
+  padding: 0 4px;
+
+  text-overflow: ellipsis;
+  word-break : break-all;
+}
+
+.queryParameter th.name-col,
+.queryParameter th.value-col {
+  background-color: #f3f4f6;
+}
+
+.table-header .name-col,
+.table-header .value-col {
+  background-color: #f3f4f6;
+}
+
+.cookies-table tr th{
+  padding: 2px;
+  background-color: #f3f4f6;
+  border: 1px solid #ccc;
+  font-weight: bold;
+}
+.cookies-table td {
+    border: 1px solid #ccc;
+    padding: 2px;
+} */
+
+:global(.cookies-table th.cookieName){
+  width: 14em;
+}
+:global(.cookies-table td.cookieValue){
+  word-break: break-all;
+}
+:global(.cookies-table th.cookiePath){
+  min-width: 8em;
+}
+:global(.cookies-table th.cookieDomain){
+  min-width: 14em;
+}
+:global(.cookies-table th.cookieExpires){
+  width: 20em;
+}
+:global(
+  .cookies-table th.cookieHttpOnly,
+  .cookies-table th.cookieSecure
+  ){
+    width: 5em;
+}
+/* 
+.timing-container {
+    width: 100%;
+  }
+  @media (min-width: 980px) {
+    .timing-container {
+
+    width: 70%;
+  }
+
+  }
+  
+  .timing-bar-container {
+    position: relative;
+    flex-grow: 1;
+    height: 16px;
+    margin: 0 12px;
+    background-color: #f3f4f6;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .timing-bar-container:hover {
+    background-color: #e5e7eb;
+  }
+*/
+  .page-header {
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+  }
+/*
+  .page-entry {
+    padding-left: 1.5rem;
+    position: relative;
+  }
+
+  .page-entry::before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    width: 0.5rem;
+    height: 1px;
+    background-color: #e5e7eb;
+  }
+
+  .entry-indent {
+    display: inline-block;
+    width: 1rem;
+  }
+
+  .table-row:hover {
+    background-color: rgba(243, 244, 246, 0.8);
+  }
+
+  .page-header:hover {
+    background-color: rgba(243, 244, 246, 0.5);
+  }
+
+
+
+.detail-row.indent{
+    margin-left: 30px;
+  } 
+  :global(.table-header.indent){
+    margin-left: 30px;
+  }
+*/
+      </style>

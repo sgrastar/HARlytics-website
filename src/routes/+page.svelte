@@ -1,9 +1,11 @@
 <script>
   import { onMount } from 'svelte';
-  import { formatTimestamp, truncateText, escapeForMermaid as escapeForSequence ,httpStatusCSSClass, formatTime, formatBytes, exportToCSV, splitByLength, parseCacheControl, isResponseCached, getCommunicationType, getTopDomain, aggregateData, copyTextarea } from '$lib/utils';
+  import { formatTimestamp, truncateText, escapeForMermaid as escapeForSequence ,httpStatusCSSClass, formatTime, formatBytes, exportToCSV, splitByLength, parseCacheControl, isResponseCached, getCommunicationType, getTopDomain, aggregateData, copyTextarea,formatGMTtoUTC, formatToLocalTime } from '$lib/utils';
   
   import { getStatusCodeData, getMimeTypeData } from '$lib/chartUtils';
   import { statusRanges, communicationTypes, httpMethods } from '$lib/constants';
+
+  import EntryDetailTable from '$lib/EntryDetailTable.svelte';
 
   import { generateMermaidHeaderAndTitle, generateMermaidQueryString,generateMermaidPostData,generateMermaidRequestCookies, generateMermaidResponse, generateMermaidResponseCookies } from '$lib/sequenceDiagramGenerator';
   import { generatePlantUMLHeaderAndTitle, generatePlantUMLQueryString, generatePlantUMLPostData, generatePlantUMLRequestCookies, generatePlantUMLResponse, generatePlantUMLResponseCookies} from '$lib/sequenceDiagramGenerator';
@@ -115,6 +117,7 @@
       harContent.log.entries[0]._initiator ? hasInitiatorInfo = true : hasInitiatorInfo = false;
 
       entries = entries.map(entry => {
+        const pageref = entry.pageref;
         const url = new URL(entry.request.url);
         const domain = url.hostname;
         const path = url.pathname;
@@ -160,6 +163,7 @@
             hasWorkspaceId || hasProjectId || 
             hasSignature || hasPartnerId || hasInstanceId;
 
+        const referer = entry.request.headers.find(header => header.name.toLowerCase() === 'referer')?.value;
         const requestPostData = parsePostData(entry.request.postData);
         const setCookieCount = entry.response.headers.filter(header => header.name.toLowerCase() === 'set-cookie').length;
         const age = entry.response.headers.find(header => header.name.toLowerCase() === 'age')?.value;
@@ -169,14 +173,21 @@
         const isCached = isResponseCached(ageInSeconds, parsedCacheControl);
 
         return {
+          pages:pages,
+          pageref: pageref,
           url: entry.request.url,
           method: entry.request.method,
           domain: domain,
           path: path,
+          referer: referer,
+          startedDateTime: entry.startedDateTime,
           time: entry.time,
           timings: entry.timings,
+          initiator: entry._initiator,
+          requestHeaderAll: entry.request.headers,
           requestPostData: requestPostData,
           requestBodySize: entry.request.bodySize,
+          responseHeaderAll: entry.response.headers,
           responseHeaderSize: entry.response.headersSize,
           responseBodySize: entry.response.bodySize,
           responseTotalSize: ((entry.response.headersSize + entry.response.bodySize) > 0) ? entry.response.headersSize + entry.response.bodySize : 0,
@@ -752,9 +763,23 @@ $: methodCounts = entries.reduce((acc, entry) => {
 
 
   <div id="display">
-    <Tabs tabStyle="underline">
+    <Tabs tabStyle="underline" class="mt-0">
 
       <TabItem open>
+        <div slot="title" class="flex items-center gap-2">
+          <BarsFromLeftOutline size="sm" />Detail
+        </div>
+        <div id="analyzeDetailDisplay">
+          <EntryDetailTable
+            entries={filteredEntries}
+            pages={pages}
+            bind:isPathTruncated
+            bind:isDomainTruncated
+          />
+        </div>
+      </TabItem>
+      
+      <!-- <TabItem>
         <div slot="title" class="flex items-center gap-2">
           <BarsFromLeftOutline size="sm" />Detail
         </div>
@@ -852,6 +877,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
           {/if}
             </div>
       </TabItem>
+       -->
       <TabItem>
         <div slot="title" class="flex items-center gap-2">
           <DrawSquareOutline size="sm" />Sequence
@@ -1148,7 +1174,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
 
           
 
-          <div id="buildTimestamp">Build ver.20241022045636</div>
+          <div id="buildTimestamp">Build ver.20241026211103</div>
         </div>
       </TabItem>
     </Tabs>

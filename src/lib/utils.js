@@ -198,3 +198,141 @@ export function copyTextarea(elemId) {
   var element = document.getElementById(elemId);
   navigator.clipboard.writeText(element.value);
 }
+
+
+export function formatGMTtoUTC(gmtDateString) {
+  if (!gmtDateString) return '';
+  
+  try {
+      const date = new Date(gmtDateString);
+      if (isNaN(date.getTime())) return '';
+      
+      return date.toISOString().slice(0, -5).replace('T', ' ');
+  } catch {
+      return '';
+  }
+}
+
+export function formatToLocalTime(gmtDateString) {
+  if (!gmtDateString) return '';
+  
+  try {
+      const date = new Date(gmtDateString);
+      if (isNaN(date.getTime())) return '';
+      
+      // タイムゾーン名を取得（例：'JST'）
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      // タイムゾーンのオフセットを取得（例：'+0900'）
+      const offset = date.getTimezoneOffset();
+      const offsetHours = Math.abs(Math.floor(offset / 60)).toString().padStart(2, '0');
+      const offsetMinutes = Math.abs(offset % 60).toString().padStart(2, '0');
+      const offsetSign = offset <= 0 ? '+' : '-';
+      const offsetString = `${offsetSign}${offsetHours}${offsetMinutes}`;
+      
+      return `${date.toLocaleString()} (${timeZone}, UTC${offsetString})`;
+  } catch {
+      return '';
+  }
+}
+
+export function formatPostDataValue(value) {
+  // nullやundefinedの処理
+  if (value === null || value === undefined) {
+    return '[null]';
+  }
+
+  // ArrayBufferとTypedArrayの処理
+  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) {
+    return '[Binary Data]';
+  }
+
+  // オブジェクトや配列の処理
+  if (typeof value === 'object') {
+    try {
+      // 深いネストされたオブジェクトの場合は概要のみ表示
+      if (JSON.stringify(value).length > 1000) {
+        return '[Complex Object]';
+      }
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      return '[Complex Object]';
+    }
+  }
+
+  // 長いテキストの処理
+  if (typeof value === 'string') {
+    // URLエンコードされている可能性のあるデータのデコードを試みる
+    try {
+      const decoded = decodeURIComponent(value);
+      // デコードしたデータが元のデータと異なり、かつ読みやすい場合のみデコード結果を使用
+      if (decoded !== value && /^[\x20-\x7E\s]+$/.test(decoded)) {
+        return decoded;
+      }
+    } catch (e) {
+      // デコードに失敗した場合は元のデータを使用
+    }
+    
+    // 長すぎるテキストの truncate
+    if (value.length > 500) {
+      return value.substring(0, 500) + '... [Text Truncated]';
+    }
+    return value;
+  }
+
+  // その他の基本型はそのまま文字列化
+  return String(value);
+}
+
+ // postDataの表示用に整形する関数
+export function normalizePostData(postData) {
+  if (!postData) return [];
+
+  // mimeTypeに基づいて適切な処理を行う
+  const result = [];
+  
+  // Content-Type に基づく処理
+  if (postData.mimeType) {
+    result.push({
+      name: 'Content-Type',
+      value: postData.mimeType
+    });
+  }
+
+  // text/plainの場合
+  if (postData.text) {
+    try {
+      // URLエンコードされたデータの処理
+      if (postData.mimeType?.includes('application/x-www-form-urlencoded')) {
+        const params = new URLSearchParams(postData.text);
+        for (const [key, value] of params) {
+          result.push({
+            name: key,
+            value: formatPostDataValue(value)
+          });
+        }
+      } else {
+        result.push({
+          name: 'Raw Data',
+          value: formatPostDataValue(postData.text)
+        });
+      }
+    } catch (e) {
+      result.push({
+        name: 'Raw Data',
+        value: formatPostDataValue(postData.text)
+      });
+    }
+  }
+
+  // paramsがある場合（マルチパートフォームデータなど）
+  if (postData.params) {
+    postData.params.forEach(param => {
+      result.push({
+        name: param.name,
+        value: formatPostDataValue(param.value)
+      });
+    });
+  }
+
+  return result;
+}
