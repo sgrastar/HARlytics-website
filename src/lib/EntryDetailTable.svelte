@@ -12,6 +12,24 @@
   let viewMode = 'entry';
   let showByPage = false;
 
+  let windowWidth;
+
+  // SvelteのonMount相当の処理
+  import { onMount } from 'svelte';
+
+  onMount(() => {
+    const updateWidth = () => {
+      windowWidth = window.innerWidth;
+    };
+
+    window.addEventListener('resize', updateWidth);
+    updateWidth();
+
+    return () => {
+      window.removeEventListener('resize', updateWidth);
+    };
+  });
+
   // より詳細な一意の識別子を生成する関数（EntryRowと同じ関数）
   const getEntryId = (entry) => {
     return [
@@ -174,18 +192,9 @@
               <div class="method header-cell">Method</div>
               <div class="status header-cell">Status</div>
               <div class="type header-cell">Type</div>
-              <div class="mimetype header-cell">mimeType</div>
-              <div class="timestamp header-cell">Timestamp</div>
-              <div class="time header-cell">Time</div>
-              <div class="size header-cell">Size</div>
-              <div class="cached header-cell">isCached</div>
-              <div class="age header-cell">age</div>
-              <div class="dns header-cell">dns</div>
-              <div class="connect header-cell">connect</div>
-              <div class="ssl header-cell">ssl</div>
-              <div class="send header-cell">send</div>
-              <div class="wait header-cell">wait</div>
-              <div class="receive header-cell">receive</div>
+              {#if window.innerWidth >= 980}
+                <div class="mimetype header-cell">mimeType</div>
+              {/if}
               <div class="sign">
                 <table>
                   <tr>
@@ -196,11 +205,29 @@
                   </tr>
                 </table>
               </div>
+              {#if window.innerWidth >= 980}
+                <div class="timestamp header-cell">Timestamp</div>
+              {/if}
+              <div class="time header-cell">Time</div>
+              <div class="size header-cell">Size</div>
+              {#if window.innerWidth >= 980}
+                <div class="cached header-cell">isCached</div>
+              {/if}
+              <!-- <div class="age header-cell">age</div> -->
+              <div class="waterfall header-cell">Waterfall</div>
+              <!-- <div class="dns header-cell">dns</div>
+              <div class="connect header-cell">connect</div>
+              <div class="ssl header-cell">ssl</div>
+              <div class="send header-cell">send</div>
+              <div class="wait header-cell">wait</div>
+              <div class="receive header-cell">receive</div> -->
+              
             </div>
 
           {#each entries.filter(entry => entry.pageref === page.id) as entry}
             <EntryRow
               {entry}
+              {entries}
               isIndented={false}
               hasPageInfo={true}
               selectedEntryIndexes={selectedEntryIds}
@@ -209,7 +236,7 @@
               toggleEntryDetails={() => toggleEntryDetails(entry)}
               handleKeyDown={(e) => handleKeyDown(e, entry)}
               {selectedTabs}
-              selectTab={(_, tab) => selectTab(entry._id || entry.url, tab)}
+              selectTab={(entryId, tab) => selectTab(getEntryId(entry), tab)}
               {normalizeHeaders}
               {normalizePostData}
               {httpStatusCSSClass}
@@ -225,23 +252,15 @@
           {/each}
         {:else}
           <div class="table-header">
+            
             <div class="path header-cell">Path</div>
             <div class="domain header-cell">Domain</div>
             <div class="method header-cell">Method</div>
             <div class="status header-cell">Status</div>
             <div class="type header-cell">Type</div>
-            <div class="mimetype header-cell">mimeType</div>
-            <div class="timestamp header-cell">Timestamp</div>
-            <div class="time header-cell">Time</div>
-            <div class="size header-cell">Size</div>
-            <div class="cached header-cell">isCached</div>
-            <div class="age header-cell">age</div>
-            <div class="dns header-cell">dns</div>
-            <div class="connect header-cell">connect</div>
-            <div class="ssl header-cell">ssl</div>
-            <div class="send header-cell">send</div>
-            <div class="wait header-cell">wait</div>
-            <div class="receive header-cell">receive</div>
+            {#if window.innerWidth >= 980}
+              <div class="mimetype header-cell">mimeType</div>
+            {/if}
             <div class="sign">
               <table>
                 <tr>
@@ -252,11 +271,29 @@
                 </tr>
               </table>
             </div>
+            {#if window.innerWidth >= 980}
+              <div class="timestamp header-cell">Timestamp</div>
+            {/if}
+            <div class="time header-cell">Time</div>
+            <div class="size header-cell">Size</div>
+            {#if window.innerWidth >= 980}
+            <div class="cached header-cell">isCached</div>
+            {/if}
+            <!-- <div class="age header-cell">age</div> -->
+            <div class="waterfall header-cell">Waterfall</div>
+            <!-- <div class="dns header-cell">dns</div>
+            <div class="connect header-cell">connect</div>
+            <div class="ssl header-cell">ssl</div>
+            <div class="send header-cell">send</div>
+            <div class="wait header-cell">wait</div>
+            <div class="receive header-cell">receive</div> -->
+            
           </div>
 
         {#each entries as entry}
           <EntryRow
             {entry}
+            {entries}
             isIndented={false}
             hasPageInfo={false}
             selectedEntryIndexes={selectedEntryIds}
@@ -265,7 +302,7 @@
             toggleEntryDetails={() => toggleEntryDetails(entry)}
             handleKeyDown={(e) => handleKeyDown(e, entry)}
             {selectedTabs}
-            selectTab={(_, tab) => selectTab(entry._id || entry.url, tab)}
+            selectTab={(entryId, tab) => selectTab(getEntryId(entry), tab)}
             {normalizeHeaders}
             {normalizePostData}
             {httpStatusCSSClass}
@@ -325,8 +362,16 @@
         font-weight: bold;
       }
       
-      .path { width: 250px; }
-      .domain { width: 210px; }
+      /* .path { width: 250px; }
+      .domain { width: 210px; } */
+      .path { 
+    width: 20%; 
+    min-width: 150px;
+  }
+  .domain { 
+    width: 10%; 
+    min-width: 150px;
+  }
       .type { width: 80px; text-align: center;}
       .mimetype { width: 150px; }
       .status { width: 60px; text-align: center; }
@@ -336,13 +381,13 @@
       .time { width: 70px; text-align: right; }
       .size { width: 70px; text-align: right; }
       .cached { width: 60px; text-align: center; }
-      .age { width: 60px; text-align: right; }
-      .dns { width: 60px; text-align: right; }
+      /* .age { width: 60px; text-align: right; } */
+      /* .dns { width: 60px; text-align: right; }
       .connect { width: 60px; text-align: right; }
       .ssl { width: 60px; text-align: right; }
       .send { width: 60px; text-align: right; }
       .wait { width: 60px; text-align: right; }
-      .receive { width: 60px; text-align: right; }
+      .receive { width: 60px; text-align: right; } */
 
       .sign table td{
         font-size: 100%;
@@ -358,6 +403,20 @@
         color: green;
       }
       
+      @media (max-width: 979px) {
+    .mimetype, 
+    .timestamp,
+    .cached {
+      display: none;
+    }
+
+    /* .path { 
+      width: 30%; 
+    }
+    .domain { 
+      width: 30%; 
+    } */
+  }
       /* .status.info,
       .status.success {
         background: #99ffa2;
@@ -673,4 +732,13 @@
     margin-left: 30px;
   }
 
+  /* .waterfall {
+    width: 256px;
+    padding: 2px;
+  } */
+
+  
+  /* :global(th.waterfall) {
+    width: 256px;
+  } */
       </style>

@@ -170,6 +170,8 @@
         const referer = entry.request.headers.find(header => header.name.toLowerCase() === 'referer')?.value;
         const requestPostData = parsePostData(entry.request.postData);
         const setCookieCount = entry.response.headers.filter(header => header.name.toLowerCase() === 'set-cookie').length;
+        const responseContentLength = entry.response.headers.find(header => header.name.toLowerCase() === 'content-length')?.value;
+        console.log(responseContentLength);
         const age = entry.response.headers.find(header => header.name.toLowerCase() === 'age')?.value;
         const ageInSeconds = age ? parseInt(age, 10) : null;
         const cacheControl = entry.response.headers.find(header => header.name.toLowerCase() === 'cache-control')?.value || '';
@@ -195,6 +197,7 @@
           responseHeaderSize: entry.response.headersSize,
           responseBodySize: entry.response.bodySize,
           responseTotalSize: ((entry.response.headersSize + entry.response.bodySize) > 0) ? entry.response.headersSize + entry.response.bodySize : 0,
+          responseContentLength: responseContentLength,
           timestamp: formatTimestamp(new Date(entry.startedDateTime)),
           age: ageInSeconds,
           cacheControl: parsedCacheControl,

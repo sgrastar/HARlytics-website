@@ -1,5 +1,9 @@
 <script>
+
+  import WaterfallBar from '$lib/WaterfallBar.svelte';
+
   export let entry;
+  export let entries = [];
   export let isIndented = false;
   export let hasPageInfo = false;
   export let selectedEntryIndexes;
@@ -20,8 +24,11 @@
   export let calculateBarWidth;
   export let calculateBarLeft;
 
+
+  
   // エントリーのユニークIDを取得する関数
   const getEntryId = (entry) => {
+    //console.log(entry);
         return [
             entry.pageref || 'no-page',  // ページ参照
             entry.url,                   // URL
@@ -32,13 +39,14 @@
 </script>
 
 <div class="table-row {hasPageInfo ? 'indent':''} entry-row {isIndented ? 'page-entry' : ''}"
-  on:click={() => toggleEntryDetails(entry)}
-  on:keydown={(e) => handleKeyDown(e, entry)}
-  role="button"
-  tabindex="0"
-  class:selected={selectedEntryIndexes.has(getEntryId(entry))}>
+    on:click={() => toggleEntryDetails(entry)}
+    on:keydown={(e) => handleKeyDown(e, entry)}
+    role="button"
+    tabindex="0"
+    class:selected={selectedEntryIndexes.has(getEntryId(entry))}>
 
-  <div class="path cell">
+    
+    <div class="path cell">
       {#if isIndented}
           <span class="entry-indent"></span>
       {/if}
@@ -60,32 +68,40 @@
   <div class="method cell {entry.method}">{entry.method}</div>
   <div class="status cell {httpStatusCSSClass(entry.status)}">{entry.status}</div>
   <div class="type cell">{entry.type}</div>
-  <div class="mimetype cell">{entry.responseMimeType}</div>              
+  <div class="mimetype cell">{entry.responseMimeType}</div>   
+  <div class="sign cell">
+    <table>
+        <tr>
+            <td class="auth">{#if entry.hasHeaderAuthData}<span title="Authorization Header">🅰</span>{/if}</td>
+            <td class="postData">{#if entry.requestPostData}<span title="Post Data">🅿</span>{/if}</td>
+            <td class="queryParameter">{#if entry.requestQueryString.length > 0}<span title="Query Parameter">🆀</span>{/if}</td>
+            <td class="cookies">{#if entry.responseCookies.length > 0}<span title="Set-Cookie">🅲</span>{/if}</td>
+        </tr>
+    </table>
+</div>           
   <div class="timestamp cell">{entry.timestamp}</div>
   {#if entry.time < 1000}
       <div class="time cell" title="{entry.time.toFixed(0)} ms">{formatTime(entry.time)}</div>              
   {:else}
       <div class="time cell" title="{entry.time.toFixed(0)} ms / {formatTime(entry.time)}">{formatTime(entry.time)}</div>
   {/if}
-  <div class="size cell">{formatBytes(entry.responseTotalSize)}</div>
+  <!-- {console.log(entry.responseContentLength + ' / ' + formatBytes(entry.responseContentLength))} -->
+  
+  <div class="size cell">{typeof entry.responseContentLength !== 'undefined' ? formatBytes(entry.responseContentLength) : ''}</div>
   <div class="cached cell">{entry.isCached ? entry.isCached : ''}</div>
-  <div class="age cell">{entry.age !== null ? entry.age : ''}</div>
-  <div class="dns cell">{entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : ''}</div>
+  <!-- <div class="age cell">{entry.age !== null ? entry.age : ''}</div> -->
+  
+  <!-- <div class="dns cell">{entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : ''}</div>
   <div class="connect cell">{entry.timings.connect >= 0 ? formatTime(entry.timings.connect) : ''}</div>
   <div class="ssl cell">{entry.timings.ssl >= 0 ? formatTime(entry.timings.ssl) : ''}</div>
   <div class="send cell">{formatTime(entry.timings.send)}</div>
   <div class="wait cell">{formatTime(entry.timings.wait)}</div>
-  <div class="receive cell">{formatTime(entry.timings.receive)}</div>
-  <div class="sign cell">
-      <table>
-          <tr>
-              <td class="auth">{#if entry.hasHeaderAuthData}<span title="Authorization Header">🅰</span>{/if}</td>
-              <td class="postData">{#if entry.requestPostData}<span title="Post Data">🅿</span>{/if}</td>
-              <td class="queryParameter">{#if entry.requestQueryString.length > 0}<span title="Query Parameter">🆀</span>{/if}</td>
-              <td class="cookies">{#if entry.responseCookies.length > 0}<span title="Set-Cookie">🅲</span>{/if}</td>
-          </tr>
-      </table>
+  <div class="receive cell">{formatTime(entry.timings.receive)}</div> -->
+  <div class="waterfall cell">
+      <WaterfallBar {entry} {entries} {hasPageInfo} formatTime={time => `${time.toFixed(1)} ms`}/>
   </div>
+
+  
 </div>
 
 {#if selectedEntryIndexes.has(getEntryId(entry))}
@@ -135,120 +151,120 @@
           </div>
           <div class="tab-content">
               {#if selectedTabs.get(getEntryId(entry)) === 'Headers'}
-                  <!-- Headers content -->
-                  <div class="headers-container">
-              <div class="header-general">
-                  <div class="header-title">General</div>
-                  <table>
-                  <tr><th>Request URL</th><td>{entry.url}</td></tr>
-                  <tr><th>Request Method</th><td>{entry.method}</td></tr>
-                  <tr><th>Status Code</th><td>{entry.status}</td></tr>
-                  <tr><th>Referer</th><td>{entry.referer ? entry.referer : ''}</td></tr>
-                  </table>
-              </div>
+              <!-- Headers content -->
+              <div class="headers-container">
+                <div class="header-general">
+                    <div class="header-title">General</div>
+                    <table>
+                    <tr><th>Request URL</th><td>{entry.url}</td></tr>
+                    <tr><th>Request Method</th><td>{entry.method}</td></tr>
+                    <tr><th>Status Code</th><td>{entry.status}</td></tr>
+                    <tr><th>Referer</th><td>{entry.referer ? entry.referer : ''}</td></tr>
+                    </table>
+                </div>
 
-              <div class="header-sections-wrapper">
+                <div class="header-sections-wrapper">
                   <div class="header-section">
-                  <div class="header-title">Response Headers</div>
-                  <div class="header-table">
+                    <div class="header-title">Response Headers</div>
+                    <div class="header-table">
                       <div class="table-header">
-                      <div class="name-col">Name</div>
-                      <div class="value-col">Value</div>
+                        <div class="name-col">Name</div>
+                        <div class="value-col">Value</div>
                       </div>
                       {#if entry.responseHeaderAll}
-                      {@const headers = normalizeHeaders(entry.responseHeaderAll)}
-                      {#if headers.length > 0}
-                          {#each headers as header}
-                          <div class="table-row">
-                              <div class="name-col">{header.name}</div>
-                              <div class="value-col">{header.value}</div>
-                          </div>
-                          {/each}
+                        {@const headers = normalizeHeaders(entry.responseHeaderAll)}
+                        {#if headers.length > 0}
+                            {#each headers as header}
+                            <div class="table-row">
+                                <div class="name-col">{header.name}</div>
+                                <div class="value-col">{header.value}</div>
+                            </div>
+                            {/each}
+                        {:else}
+                            <div class="table-row">
+                            <div class="no-data">No response headers</div>
+                            </div>
+                        {/if}
                       {:else}
-                          <div class="table-row">
-                          <div class="no-data">No response headers</div>
-                          </div>
+                        <div class="table-row">
+                            <div class="no-data">No response headers</div>
+                        </div>
                       {/if}
-                      {:else}
-                      <div class="table-row">
-                          <div class="no-data">No response headers</div>
-                      </div>
-                      {/if}
+                    </div>
                   </div>
-                  </div>
-                  
+                    
                   <div class="header-section">
-                  <div class="header-title">Request Headers</div>
-                  <div class="header-table">
+                    <div class="header-title">Request Headers</div>
+                    <div class="header-table">
                       <div class="table-header">
-                      <div class="name-col">Name</div>
-                      <div class="value-col">Value</div>
+                        <div class="name-col">Name</div>
+                        <div class="value-col">Value</div>
                       </div>
                       {#if entry.requestHeaderAll}
-                      {@const headers = normalizeHeaders(entry.requestHeaderAll)}
-                      {#if headers.length > 0}
-                          {#each headers as header}
-                          <div class="table-row">
-                              <div class="name-col">{header.name}</div>
-                              <div class="value-col">{header.value}</div>
-                          </div>
-                          {/each}
+                        {@const headers = normalizeHeaders(entry.requestHeaderAll)}
+                        {#if headers.length > 0}
+                            {#each headers as header}
+                            <div class="table-row">
+                                <div class="name-col">{header.name}</div>
+                                <div class="value-col">{header.value}</div>
+                            </div>
+                            {/each}
+                        {:else}
+                            <div class="table-row">
+                            <div class="no-data">No request headers</div>
+                            </div>
+                        {/if}
                       {:else}
-                          <div class="table-row">
-                          <div class="no-data">No request headers</div>
-                          </div>
+                        <div class="table-row">
+                            <div class="no-data">No request headers</div>
+                        </div>
                       {/if}
-                      {:else}
-                      <div class="table-row">
-                          <div class="no-data">No request headers</div>
-                      </div>
-                      {/if}
+                    </div>
                   </div>
-                  </div>
+                </div>
               </div>
-              </div>
+            
               {:else if selectedTabs.get(getEntryId(entry)) === 'Payload'}
-                  <!-- Payload content -->
-                  <div class="payload-container">
-              <div class="payload-selections-wrapper">
+              <!-- Payload content -->
+              <div class="payload-container">
+                <div class="payload-selections-wrapper">
 
                   <!-- {console.log(entry.requestPostData)} -->
                   {#if entry.requestQueryString.length > 0}
-                  <div class="payload-title">Querty Parameter</div>
-                  <table div class="payload-table queryParameter">
-                  <tr>
-                      <th class="payloadName name-col">Name</th>
-                      <th class="payloadValue value-col">Value</th>
-                  </tr>
-                  {#each entry.requestQueryString as requestQueryString}
-                      <tr>
-                      <td class="payloadName name-col">{requestQueryString.name}</td>
-                      <td class="payloadValue value-col">{requestQueryString.value}</td>
-                      </tr>
-                  {/each}
-                  </table>
+                    <div class="payload-title">Querty Parameter</div>
+                    <table div class="payload-table queryParameter">
+                    <tr>
+                        <th class="payloadName name-col">Name</th>
+                        <th class="payloadValue value-col">Value</th>
+                    </tr>
+                    {#each entry.requestQueryString as requestQueryString}
+                        <tr>
+                        <td class="payloadName name-col">{requestQueryString.name}</td>
+                        <td class="payloadValue value-col">{requestQueryString.value}</td>
+                        </tr>
+                    {/each}
+                    </table>
                   {/if}
 
                   {#if entry.requestPostData}
-                  {@const postDataParams = normalizePostData(entry.requestPostData)}
-                  <div class="payload-title">Post Data</div>
-                  MimeType : {entry.requestPostData.mimeType}
-                  <table div class="payload-table postData">
-                  <tr>
-                      <th class="payloadName name-col">Name</th>
-                      <th class="payloadValue value-col">Value</th>
-                  </tr>
-                  
-                  {#each postDataParams as param}
+                    {@const postDataParams = normalizePostData(entry.requestPostData)}
+                    <div class="payload-title">Post Data</div>
+                    MimeType : {entry.requestPostData.mimeType}
+                    <table div class="payload-table postData">
                       <tr>
-                      <td class="payloadName name-col">{param.name}</td>
-                      <td class="payloadValue value-col">{param.value}</td>
+                          <th class="payloadName name-col">Name</th>
+                          <th class="payloadValue value-col">Value</th>
                       </tr>
-                  {/each}
-                  </table>
+                    
+                      {#each postDataParams as param}
+                          <tr>
+                          <td class="payloadName name-col">{param.name}</td>
+                          <td class="payloadValue value-col">{param.value}</td>
+                          </tr>
+                      {/each}
+                    </table>
                   {/if}
-
-                  </div>
+                </div>
               </div>
           {:else if selectedTabs.get(getEntryId(entry)) === 'Response'}
               <!-- Response content -->
@@ -518,13 +534,28 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
+  .sign.cell{
+    padding: 0;
+  }
   
   .header-cell {
     font-weight: bold;
   }
+
+  .cell.waterfall {
+      overflow: visible;
+  }
   
-  .path { width: 250px; }
-  .domain { width: 210px; }
+  .path { 
+    width: 20%; 
+    min-width: 150px;
+  }
+  .domain { 
+    width: 10%; 
+    min-width: 150px;
+  }
+  /* .path { width: 250px; }
+  .domain { width: 210px; } */
   .type { width: 80px; text-align: center;}
   .mimetype { width: 150px; }
   .status { width: 60px; text-align: center; }
@@ -534,7 +565,7 @@
   .time { width: 70px; text-align: right; }
   .size { width: 70px; text-align: right; }
   .cached { width: 60px; text-align: center; }
-  .age { width: 60px; text-align: right; }
+  /* .age { width: 60px; text-align: right; } */
   .dns { width: 60px; text-align: right; }
   .connect { width: 60px; text-align: right; }
   .ssl { width: 60px; text-align: right; }
@@ -556,6 +587,21 @@
     color: green;
   }
   
+  @media (max-width: 979px) {
+    .mimetype, 
+    .timestamp,
+    .cached {
+      display: none;
+    }
+
+    /* .path { 
+      width: 30%; 
+    }
+    .domain { 
+      width: 30%; 
+    } */
+  }
+
   .status.info,
   .status.success {
     background: #99ffa2;
@@ -875,6 +921,18 @@ background-color: rgba(243, 244, 246, 0.5)
 :global(.table-row.indent){
   margin-left: 30px;
 }
+.waterfall {
+    flex: 1;
+    min-width: 150px;
+    overflow: visible;
+  }
+/* .waterfall {
+        width: 256px;
+        padding: 2px;
+    }
+    
 
-
+    :global(th.waterfall) {
+        width: 256px;
+    } */
   </style>
