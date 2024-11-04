@@ -92,7 +92,7 @@ export function formatTimestamp(date) {
     return sign * value + ' ' + units[i];
   }
   
-  export function exportToCSV(data, headers, logFilename) {
+  export function exportToCSV(data, headers, logFilename, suffix) {
     const csvContent = [
       headers.join(','),
       ...data.map(row => row.map(String).map(v => `"${v.replace(/"/g, '""')}"`).join(','))
@@ -102,7 +102,7 @@ export function formatTimestamp(date) {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', logFilename + '_cookie.csv');
+    link.setAttribute('download', logFilename + suffix +'.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

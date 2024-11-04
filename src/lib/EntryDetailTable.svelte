@@ -198,10 +198,10 @@
               <div class="sign">
                 <table>
                   <tr>
-                    <td class="auth"><span title="Authorization Header">🅰</span></td>
-                    <td class="postData"><span title="Post Data">🅿</span></td>
-                    <td class="queryParameter"><span title="Query Parameter">🆀</span></td>
-                    <td class="cookies"><span title="Set-Cookie">🅲</span></td>
+                    <td class="auth"><span title="Authorization Header">A</span></td>
+                    <td class="postData"><span title="Post Data">P</span></td>
+                    <td class="queryParameter"><span title="Query Parameter">Q</span></td>
+                    <td class="cookies"><span title="Set-Cookie">C</span></td>
                   </tr>
                 </table>
               </div>
@@ -264,10 +264,10 @@
             <div class="sign">
               <table>
                 <tr>
-                  <td class="auth"><span title="Authorization Header">🅰</span></td>
-                  <td class="postData"><span title="Post Data">🅿</span></td>
-                  <td class="queryParameter"><span title="Query Parameter">🆀</span></td>
-                  <td class="cookies"><span title="Set-Cookie">🅲</span></td>
+                  <td class="auth"><span title="Authorization Header">A</span></td>
+                  <td class="postData"><span title="Post Data">P</span></td>
+                  <td class="queryParameter"><span title="Query Parameter">Q</span></td>
+                  <td class="cookies"><span title="Set-Cookie">C</span></td>
                 </tr>
               </table>
             </div>
@@ -346,10 +346,10 @@
         flex-direction: column;
       }
       
-      .table-row {
+      /* .table-row {
         display: flex;
         border-bottom: 1px solid #eee;
-      }
+      } */
       
       .header-cell, .cell {
         padding: 3px;
@@ -377,7 +377,7 @@
       .status { width: 60px; text-align: center; }
       .method { width: 70px; text-align: center; }
       .timestamp { width: 150px; }
-      .cookies { width: 60px; text-align: right; }
+      /* .cookies { width: 60px; text-align: right; } */
       .time { width: 70px; text-align: right; }
       .size { width: 70px; text-align: right; }
       .cached { width: 60px; text-align: center; }

@@ -72,10 +72,10 @@
   <div class="sign cell">
     <table>
         <tr>
-            <td class="auth">{#if entry.hasHeaderAuthData}<span title="Authorization Header">🅰</span>{/if}</td>
-            <td class="postData">{#if entry.requestPostData}<span title="Post Data">🅿</span>{/if}</td>
-            <td class="queryParameter">{#if entry.requestQueryString.length > 0}<span title="Query Parameter">🆀</span>{/if}</td>
-            <td class="cookies">{#if entry.responseCookies.length > 0}<span title="Set-Cookie">🅲</span>{/if}</td>
+            <td class="auth">{#if entry.hasHeaderAuthData}<span title="Authorization Header">A</span>{/if}</td>
+            <td class="postData">{#if entry.requestPostData}<span title="Post Data">P</span>{/if}</td>
+            <td class="queryParameter">{#if entry.requestQueryString.length > 0}<span title="Query Parameter">Q</span>{/if}</td>
+            <td class="cookies">{#if entry.responseCookies.length > 0}<span title="Set-Cookie">C</span>{/if}</td>
         </tr>
     </table>
 </div>           
@@ -561,7 +561,7 @@
   .status { width: 60px; text-align: center; }
   .method { width: 70px; text-align: center; }
   .timestamp { width: 150px; }
-  .cookies { width: 60px; text-align: right; }
+  /* .cookies { width: 60px; text-align: right; } */
   .time { width: 70px; text-align: right; }
   .size { width: 70px; text-align: right; }
   .cached { width: 60px; text-align: center; }
@@ -573,7 +573,7 @@
   .wait { width: 60px; text-align: right; }
   .receive { width: 60px; text-align: right; }
 
-  .sign table td{
+  :global(.sign table td){
     font-size: 100%;
     font-weight: bold;
     width: 1.2em;

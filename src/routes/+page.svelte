@@ -440,7 +440,7 @@
     truncatedValues[valueName] = !truncatedValues[valueName];
   }
 
-  function handleExportCSV() {
+  function handleCookieExportCSV() {
     const csvData = filteredEntries.map(entry => [
       entry.path,
       entry.domain,
@@ -469,7 +469,8 @@
         'Timestamp',
         ...[...valueNames].flatMap(name => [`${name}(Req)`, `${name}(Res)`])
       ],
-      logFilename
+      logFilename,
+      '_cookies'
     );
   }
 
@@ -1148,7 +1149,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
         <div>
           {#if filteredEntries.length > 0}
           <div class="flex flex-row-reverse mb-2">
-            <Button size="xs" on:click={handleExportCSV}><FileCsvOutline class="w-4 h-4 me-2" />Export Data to CSV</Button>
+            <Button size="xs" on:click={handleCookieExportCSV}><FileCsvOutline class="w-4 h-4 me-2" />Export Data to CSV</Button>
           </div>
           {/if}
         <div id="analyzeCookieDisplay">
@@ -1326,7 +1327,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
 
           
 
-          <div id="buildTimestamp">Build ver.20241026211103</div>
+          <div id="buildTimestamp">Build ver.20241105023559</div>
         </div>
       </TabItem>
     </Tabs>
@@ -1367,10 +1368,10 @@ $: methodCounts = entries.reduce((acc, entry) => {
     height: 53vh;
     overflow: scroll;
   }
-  #analyzeDetailDisplay table {
+  /* #analyzeDetailDisplay table {
     border-collapse: collapse;
     border: none;
-  }
+  } */
   #analyzeCookieDisplay table {
     border-collapse: collapse;
     width: 100%;
@@ -1501,7 +1502,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
     background: #ff4554;
     color: #fff;
   }
-  tbody td.setCookies,
+  /* tbody td.setCookies,
   tbody td.time,
   tbody td.size,
   tbody td.dns,
@@ -1511,7 +1512,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
   tbody td.wait,
   tbody td.receive {
       text-align: right;
-  }
+  } */
 
   .truncate-icon {
     cursor: pointer;
