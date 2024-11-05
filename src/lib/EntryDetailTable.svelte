@@ -259,7 +259,7 @@
                 <div class="flex-grow font-medium" title="{page.title}">
                   {truncateText(page.title, 100) || `Page ${page.id}`} 
                   <span class="text-sm text-gray-600" style="display: inline-block; float:right;">
-                     (Load: {formatTime(page.pageTimings.onLoad)})
+                     (Load: {page.pageTimings.onLoad !== null ? formatTime(page.pageTimings.onLoad) : 'N/A'})
                   </span>
                 </div>
               </div>
