@@ -1,11 +1,14 @@
 <script>
-  import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes,formatGMTtoUTC, formatToLocalTime, formatPostDataValue, normalizePostData } from '$lib/utils';
-  import { Radio } from 'flowbite-svelte';
+  import { formatTimestamp, truncateText, httpStatusCSSClass, formatTime, formatBytes,formatGMTtoUTC, formatToLocalTime, formatPostDataValue, normalizePostData, exportToCSV } from '$lib/utils';
+  import { Button,Radio } from 'flowbite-svelte';
+  import { FileCsvOutline } from 'flowbite-svelte-icons';
+
 
   import EntryRow from '$lib/EntryRow_general.svelte';
   
   export let entries = [];
   export let pages = [];
+  export let logFilename;
   export let isPathTruncated = true;
   export let isDomainTruncated = true;
 
@@ -57,6 +60,73 @@
   $: hasPagesInfo = pages && pages.length > 0;
   $: if (!hasPagesInfo && viewMode === 'page') {
     viewMode = 'entry';
+  }
+
+  function handleDetailExportCSV() {
+    const csvHeaderData = entries.map(entry => [
+      typeof entry.pageref !== 'undefined' ? entry.pageref : '',
+      entry.path,
+      entry.domain,
+      entry.method,
+      entry.status,
+      entry.type,
+      entry.responseMimeType,
+      entry.timestamp,
+      entry.time.toFixed(0),
+      formatTime(entry.time),
+      typeof entry.responseContentLength !== 'undefined' ? entry.responseContentLength : '',
+      typeof entry.responseContentLength !== 'undefined' ? formatBytes(entry.responseContentLength) : '',
+      entry.isCached ? entry.isCached : '',
+      entry.age !== null ? entry.age : '',
+      entry.age !== null ? formatTime(entry.age) : '',
+      entry.timings.dns >= 0 ? entry.timings.dns.toFixed(2) : '',
+      entry.timings.dns >= 0 ? formatTime(entry.timings.dns) : '',
+      entry.timings.connect >= 0 ? entry.timings.connect.toFixed(2) : '',
+      entry.timings.connect >= 0 ? formatTime(entry.timings.connect) : '',
+      entry.timings.ssl >= 0 ? entry.timings.ssl.toFixed(2) : '',
+      entry.timings.ssl >= 0 ? formatTime(entry.timings.ssl) : '',
+      entry.timings.send.toFixed(2),
+      formatTime(entry.timings.send),
+      entry.timings.wait.toFixed(2),
+      formatTime(entry.timings.wait),
+      entry.timings.receive.toFixed(2),
+      formatTime(entry.timings.receive)
+    ]);
+
+    exportToCSV(
+      csvHeaderData,
+      [
+        'pageref',
+        'Path',
+        'Domain',
+        'Method',
+        'Status',
+        'Type',
+        'mimetype',
+        'Timestamp',
+        'Time',
+        'Time-formatted',
+        'Size',
+        'Size-formatted',
+        'IsCached',
+        'Age',
+        'Age-formatted',
+        'DNS',
+        'DNS-formatted',
+        'Connect',
+        'Connect-formatted',
+        'SSL',
+        'SSL-formatted',
+        'Send',
+        'Send-formatted',
+        'Wait',
+        'Wait-formatted',
+        'Receive',
+        'Receive-formatted'
+      ],
+      logFilename,
+      '_detail'
+    );
   }
 
   // IDベースのトグル関数
@@ -158,7 +228,8 @@
 </script>
 
 <div class="p-2">
-      <div class="flex gap-3">
+  <div class="grid grid-cols-12 ">
+      <div class="col-span-3 flex gap-3">
         <Radio bind:group={viewMode} value="entry" on:click={() => showByPage = false}>Entry View</Radio>
         {#if hasPagesInfo}
           <Radio bind:group={viewMode} value="page" on:click={() => showByPage = true}>Page View</Radio>
@@ -166,6 +237,14 @@
           <Radio bind:group={viewMode} value="second" disabled>Page View</Radio>
         {/if}
       </div>
+      <div class="col-span-9">
+        {#if entries.length > 0}
+        <div class="flex flex-row-reverse">
+          <Button size="xs" on:click={handleDetailExportCSV}><FileCsvOutline class="w-4 h-4 me-2" />Export Data to CSV</Button>
+        </div>
+        {/if}
+      </div>
+    </div>
 </div>
 
 <div class="request-detail-table">
@@ -179,8 +258,8 @@
               <div class="flex items-center px-2 py-1 bg-gray-100">
                 <div class="flex-grow font-medium" title="{page.title}">
                   {truncateText(page.title, 100) || `Page ${page.id}`} 
-                  <span class="text-sm text-gray-600">
-                    <!-- (Load: {formatTime(page.pageTimings.onLoad)}) -->
+                  <span class="text-sm text-gray-600" style="display: inline-block; float:right;">
+                     (Load: {formatTime(page.pageTimings.onLoad)})
                   </span>
                 </div>
               </div>
@@ -351,7 +430,7 @@
         border-bottom: 1px solid #eee;
       } */
       
-      .header-cell, .cell {
+      .header-cell {
         padding: 3px;
         white-space: nowrap;
         overflow: hidden;
@@ -693,6 +772,7 @@
     border-bottom: 1px solid #e5e7eb;
     position: sticky;
     top: 0;
+    z-index: 2;
   }
 /*
   .page-entry {
@@ -725,9 +805,9 @@
 
 
 */
-.detail-row.indent{
+/* .detail-row.indent{
     margin-left: 30px;
-  } 
+  }  */
   :global(.table-header.indent){
     margin-left: 30px;
   }

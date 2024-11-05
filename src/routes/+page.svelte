@@ -108,6 +108,16 @@
   function analyzeHAR(event) {
     const file = event.target.files[0];
     logFilename = file.name;
+    // Initialize
+    logVersion = '';
+    logCreator = '';
+    hasPagesInfo = false;
+    hasInitiatorInfo = false;
+    hasCookieData = false;
+    hasPostData = false;
+    hasContentData = false;
+    hasHeaderAuthData = false;
+
     const reader = new FileReader();
 
     reader.onload = function (e) {
@@ -121,7 +131,7 @@
       harContent.log.entries[0]._initiator ? hasInitiatorInfo = true : hasInitiatorInfo = false;
 
       entries = entries.map(entry => {
-        const pageref = entry.pageref;
+        const pageref = hasPagesInfo && entry.pageref ? entry.pageref : 'NoPageRef';
         const url = new URL(entry.request.url);
         const domain = url.hostname;
         const path = url.pathname;
@@ -171,7 +181,6 @@
         const requestPostData = parsePostData(entry.request.postData);
         const setCookieCount = entry.response.headers.filter(header => header.name.toLowerCase() === 'set-cookie').length;
         const responseContentLength = entry.response.headers.find(header => header.name.toLowerCase() === 'content-length')?.value;
-        console.log(responseContentLength);
         const age = entry.response.headers.find(header => header.name.toLowerCase() === 'age')?.value;
         const ageInSeconds = age ? parseInt(age, 10) : null;
         const cacheControl = entry.response.headers.find(header => header.name.toLowerCase() === 'cache-control')?.value || '';
@@ -439,6 +448,8 @@
   function toggleValueTruncation(valueName) {
     truncatedValues[valueName] = !truncatedValues[valueName];
   }
+
+  
 
   function handleCookieExportCSV() {
     const csvData = filteredEntries.map(entry => [
@@ -918,14 +929,16 @@ $: methodCounts = entries.reduce((acc, entry) => {
   <div id="display">
     <Tabs tabStyle="underline" class="mt-0">
 
-      <TabItem open>
+      <TabItem open class="p-0">
         <div slot="title" class="flex items-center gap-2">
           <BarsFromLeftOutline size="sm" />Detail
         </div>
         <div id="analyzeDetailDisplay">
+
           <EntryDetailTable
             entries={filteredEntries}
             pages={pages}
+            logFilename={logFilename}
             bind:isPathTruncated
             bind:isDomainTruncated
           />
@@ -1327,7 +1340,7 @@ $: methodCounts = entries.reduce((acc, entry) => {
 
           
 
-          <div id="buildTimestamp">Build ver.20241105023559</div>
+          <div id="buildTimestamp">Build ver.20241106020659</div>
         </div>
       </TabItem>
     </Tabs>
@@ -1363,6 +1376,11 @@ $: methodCounts = entries.reduce((acc, entry) => {
   left: 0;
   margin-top: 0.25rem;
 }
+
+  :global(div[role="tabpanel"]) {
+    padding: 1em;
+    margin-top: 0;
+  }
 
   #analyzeCookieDisplay{
     height: 53vh;
