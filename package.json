@@ -6,23 +6,32 @@
 		"preinstall": "npx only-allow pnpm",
 		"dev": "vite dev",
 		"build": "node ./build.js && vite build",
-		"preview": "vite preview"
+		"preview": "vite preview",
+		"test": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
+		"@playwright/test": "^1.48.2",
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"@testing-library/jest-dom": "^6.6.3",
+		"@testing-library/svelte": "^5.2.4",
+		"@vitest/coverage-v8": "^2.1.4",
 		"autoprefixer": "^10.4.19",
 		"d3": "^7.9.0",
 		"flowbite": "^2.3.0",
 		"flowbite-svelte": "^0.46.1",
 		"flowbite-svelte-icons": "^1.6.1",
+		"jsdom": "^25.0.1",
 		"mermaid": "^10.9.1",
 		"postcss": "^8.4.38",
 		"svelte": "^4.2.7",
 		"sveltekit-adapter-chrome-extension": "^2.0.1",
 		"tailwindcss": "^3.4.3",
-		"vite": "^5.0.3"
+		"vite": "^5.0.3",
+		"vitest": "^2.1.4"
 	},
 	"type": "module"
 }

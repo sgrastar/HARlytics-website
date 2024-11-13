@@ -20,7 +20,7 @@ export function generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNu
   }
   
   export function generateMermaidQueryString(entry, addRequestQueryString, truncateQueryStrings, truncateQueryStringsLength) {
-    if (addRequestQueryString && entry.requestQueryString.length > 0) {
+    if (addRequestQueryString && entry.requestQueryString && entry.requestQueryString.length > 0) {
       let requestQueryStringString = '';
       
       if (truncateQueryStrings) {
@@ -29,8 +29,7 @@ export function generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNu
         ).join('<br>');
       } else {
         requestQueryStringString = entry.requestQueryString.map(Qstring => {
-          const lines = splitByLength(`${Qstring.name}: ${Qstring.value}`, 50);
-          return escapeForMermaid(lines.join('<br>'));
+          return `${escapeForMermaid(Qstring.name)}&#58; ${escapeForMermaid(Qstring.value)}`;
         }).join('<br>');
       }
       return `note over ${entry.domain}: [Query String]<br>${requestQueryStringString}\n`;
@@ -138,7 +137,7 @@ export function generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNu
   }
   
   export function generatePlantUMLQueryString(entry, addRequestQueryString, truncateQueryStrings, truncateQueryStringsLength) {
-    if (addRequestQueryString && entry.requestQueryString.length > 0) {
+    if (addRequestQueryString && entry.requestQueryString && entry.requestQueryString.length > 0) {
       let requestQueryStringString = '';
       
       if (truncateQueryStrings) {

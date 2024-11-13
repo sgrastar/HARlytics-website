@@ -12,8 +12,10 @@ export function formatTimestamp(date) {
   
 
   export function truncateText(text, maxLength) {
-    if (text.length <= maxLength) return text;
-    return text.slice(0, maxLength) + '...';
+    if (!text) return '';  // nullやundefinedの場合は空文字を返す
+    const str = String(text);  // 数値などの場合も文字列に変換
+    if (str.length <= maxLength) return str;
+    return str.slice(0, maxLength) + '...';
   }
 
   export const escapeForMermaid = (text) => {
@@ -59,38 +61,45 @@ export function formatTimestamp(date) {
   }
 
   export function formatTime(time) {
-    let formattedTime = '';
-  
     if (time < 1000) {
-      formattedTime = time.toFixed(0) + " ms";
+      return `${Math.floor(time)} ms`;
     } else if (time < 60000) {
-      formattedTime = (time / 1000).toFixed(2) + " s";
+      // 秒単位での表示（60秒未満）
+      const seconds = time / 1000;
+      // 59.99秒のような境界値を適切に処理
+      return `${Math.min(seconds, 59.99).toFixed(2)} s`;
     } else if (time < 3600000) {
+      // 分と秒での表示（60分未満）
       const minutes = Math.floor(time / 60000);
-      const seconds = ((time % 60000) / 1000).toFixed(0);
-      formattedTime = minutes + " min " + (seconds < 10 ? '0' : '') + seconds + " s";
+      const seconds = Math.floor((time % 60000) / 1000);
+      // 秒が60になるのを防ぐ
+      if (seconds === 60) {
+        return `${minutes + 1} min 00 s`;
+      }
+      return `${minutes} min ${String(seconds).padStart(2, '0')} s`;
     } else {
+      // 時、分、秒での表示
       const hours = Math.floor(time / 3600000);
       const minutes = Math.floor((time % 3600000) / 60000);
-      const seconds = ((time % 60000) / 1000).toFixed(0);
-      formattedTime = hours + " h " + (minutes < 10 ? '0' : '') + minutes + " min " + (seconds < 10 ? '0' : '') + seconds + " s";
+      const seconds = Math.floor((time % 60000) / 1000);
+      return `${hours} h ${String(minutes).padStart(2, '0')} min ${String(seconds).padStart(2, '0')} s`;
     }
-  
-    return formattedTime;
   }
 
   export function formatBytes(bytes) {
-    if (bytes == 0) return '0 B';
+    if (bytes === 0) return '0 B';
   
     const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const sign = Math.sign(bytes);
     bytes = Math.abs(bytes);
   
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    // toFixedを必ず適用して、小数点以下1桁を表示
     const value = (bytes / Math.pow(1024, i)).toFixed(1);
   
-    return sign * value + ' ' + units[i];
+    return sign < 0 ? '-' + value + ' ' + units[i] : value + ' ' + units[i];
   }
+
   
   export function exportToCSV(data, headers, logFilename, suffix) {
     const csvContent = [
@@ -120,13 +129,31 @@ export function formatTimestamp(date) {
   }
   
   export function parseCacheControl(cacheControlHeader) {
+    // 空文字列や未定義の場合は空オブジェクトを返す
+    if (!cacheControlHeader) {
+      return {};
+    }
+  
     const directives = cacheControlHeader.split(',').map(directive => directive.trim());
     const parsedDirectives = {};
   
     for (const directive of directives) {
+      // 空の項目をスキップ
+      if (!directive) {
+        continue;
+      }
+  
       const [key, value] = directive.split('=');
-      parsedDirectives[key] = value ? parseInt(value, 10) : true;
+      const trimmedKey = key.trim();
+      
+      // キーが空の場合はスキップ
+      if (!trimmedKey) {
+        continue;
+      }
+  
+      parsedDirectives[trimmedKey] = value ? parseInt(value, 10) : true;
     }
+  
     return parsedDirectives;
   }
   
@@ -144,13 +171,37 @@ export function formatTimestamp(date) {
   }
   
   export function getCommunicationType(entry) {
+    // WebSocketの判定を最初に行う
+    if (entry._webSocketMessages) {
+      return 'WS';
+    }
+  
     const contentType = entry.response.content.mimeType;
     if (!contentType) {
       return 'Other';
-    } else if (contentType.includes('json') || contentType.includes('xml')) {
+    }
+  
+
+    if (contentType.includes('application/xml') || 
+    contentType.includes('text/xml')) {
       return 'Fetch/XHR';
-    } else if (contentType.includes('html')) {
+    }
+
+    // XMLベースのドキュメントタイプの判定
+    if (contentType.includes('html') || 
+        contentType.includes('xhtml') ||
+        contentType.includes('xml')) {
       return 'Doc';
+    }
+  
+    // マニフェストファイルの判定
+    if (contentType.includes('manifest')) {
+      return 'Manifest';
+    }
+  
+    // その他のタイプの判定
+    if (contentType.includes('json')) {
+      return 'Fetch/XHR';
     } else if (contentType.includes('css')) {
       return 'CSS';
     } else if (contentType.includes('javascript')) {
@@ -161,15 +212,11 @@ export function formatTimestamp(date) {
       return 'Img';
     } else if (contentType.includes('audio') || contentType.includes('video')) {
       return 'Media';
-    } else if (contentType.includes('manifest')) {
-      return 'Manifest';
-    } else if (entry._webSocketMessages) {
-      return 'WS';
     } else if (contentType.includes('wasm')) {
       return 'Wasm';
-    } else {
-      return 'Other';
-    }
+    } 
+  
+    return 'Other';
   }
   
   export function getTopDomain(domain) {
@@ -195,8 +242,10 @@ export function aggregateData(entries, key) {
 }
 
 export function copyTextarea(elemId) {
-  var element = document.getElementById(elemId);
-  navigator.clipboard.writeText(element.value);
+  const element = document.getElementById(elemId);
+  if (element && element.value) {
+    navigator.clipboard.writeText(element.value);
+  }
 }
 
 

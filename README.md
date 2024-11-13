@@ -1,4 +1,11 @@
-# HARlytics 🔍
+
+<h1 align="center">
+HARlytics
+</h1>
+<p align="center">
+Making HTTP tell its story
+</p>
+
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/{extension-id})](https://chrome.google.com/webstore/detail/{extension-id})
@@ -75,34 +82,18 @@ Access the web version directly:
 - No external data transmission required
 - Zero data storage or collection
 
-## 💡 Use Cases
-
-### For Developers
-- Debug API interactions
-- Optimize resource loading
-- Analyze request/response patterns
-- Document API flows
-
-### For QA Engineers
-- Validate network calls
-- Create test documentation
-- Monitor application behavior
-- Generate test evidence
-
-### For Security Professionals
-- Inspect HTTP headers
-- Analyze request patterns
-- Review security headers
-- Validate HTTPS implementation
-
 
 ## 🛠️ Technical Details
 
-- Built with Svelte 4 & JavaScript
-- Pure client-side processing
-- Modern browser compatible
+Built with these amazing tools, libraries, and packages. Thanks to all the open-source contributors who made this project possible.
 
-## 🆘 Support
+ - **Framework & UI**: Svelte 4(JavaScript), Flowbite-Svelte, Flowbite-Svelte-icon, Tailwind CSS
+ - **Testing & Coverage**: Vitest, jest-dom
+ - **Data Visualization**: Mermaid, D3.js
+ - **Build Tools**: Vite, PostCSS, Autoprefixer
+ - **Browser Extension**: SvelteKit Chrome Extension Adapter
+
+##  Support
 
 Need help? Please create an [Issue](https://github.com/sgrastar/HARlytics/issues) on our GitHub repository.
 
