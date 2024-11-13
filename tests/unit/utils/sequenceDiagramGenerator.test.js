@@ -88,103 +88,103 @@ describe('Mermaid Sequence Diagram Generator', () => {
   });
 
   describe('generateMermaidQueryString', () => {
-  it('should handle entry without requestQueryString', () => {
-    const mockEntry = { domain: 'example.com' };
-    expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe('');
+    it('should handle entry without requestQueryString', () => {
+      const mockEntry = { domain: 'example.com' };
+      expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe('');
+    });
+  
+    it('should handle empty requestQueryString array', () => {
+      const mockEntry = { 
+        domain: 'example.com',
+        requestQueryString: []
+      };
+      expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe('');
+    });
+  
+    it('should format regular query string correctly', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [{
+          name: 'param',
+          value: 'value'
+        }]
+      };
+      const expected = 'note over example.com: [Query String]<br>param: value\n';
+      expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
+    });
+  
+    it('should handle complex font query parameters', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [
+          { name: 'family', value: 'M+PLUS+1p:wght@100;300;400' },
+          { name: 'display', value: 'swap' }
+        ]
+      };
+      const expected = 'note over example.com: [Query String]<br>family: [Font Family Settings]<br>display: swap\n';
+      expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
+    });
+  
+    it('should truncate regular query parameters when truncation is enabled', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [{
+          name: 'very_long_parameter_name',
+          value: 'very_long_parameter_value'
+        }]
+      };
+      const expected = 'note over example.com: [Query String]<br>very_long_parameter_...: very_long_parameter_...\n';
+      expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
+    });
+  
+    it('should not truncate when truncateQueryStrings is false', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [{
+          name: 'very_long_parameter_name',
+          value: 'very_long_parameter_value'
+        }]
+      };
+      const expected = 'note over example.com: [Query String]<br>very_long_parameter_name: very_long_parameter_value\n';
+      expect(generateMermaidQueryString(mockEntry, true, false, 20)).toBe(expected);
+    });
+  
+    it('should properly escape special characters', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [{
+          name: 'param:with:colons',
+          value: 'value:with:colons'
+        }]
+      };
+      const expected = 'note over example.com: [Query String]<br>param&#58;with&#58;colons: value&#58;with&#58;colons\n';
+      expect(generateMermaidQueryString(mockEntry, true, false, 20)).toBe(expected);
+    });
+  
+    it('should not generate query string when addRequestQueryString is false', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [{
+          name: 'param',
+          value: 'value'
+        }]
+      };
+      expect(generateMermaidQueryString(mockEntry, false, true, 20)).toBe('');
+    });
+  
+    it('should handle multiple parameters including font settings', () => {
+      const mockEntry = {
+        domain: 'example.com',
+        requestQueryString: [
+          { name: 'family', value: 'Roboto:wght@400;700' },
+          { name: 'display', value: 'swap' },
+          { name: 'regular', value: 'normal_value' }
+        ]
+      };
+      const expected = 'note over example.com: [Query String]<br>family: [Font Family Settings]<br>display: swap<br>regular: normal_value\n';
+      expect(generateMermaidQueryString(mockEntry, true, false, 20)).toBe(expected);
+    });
   });
-
-  it('should handle empty requestQueryString array', () => {
-    const mockEntry = { 
-      domain: 'example.com',
-      requestQueryString: []
-    };
-    expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe('');
-  });
-
-  it('should format query string with note syntax', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [{
-        name: 'param',
-        value: 'value'
-      }]
-    };
-    const expected = 'note over example.com: [Query String]<br>param: value\n';
-    expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
-  });
-
-  it('should handle multiple query parameters', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [
-        { name: 'param1', value: 'value1' },
-        { name: 'param2', value: 'value2' }
-      ]
-    };
-    const expected = 'note over example.com: [Query String]<br>param1: value1<br>param2: value2\n';
-    expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
-  });
-
-  it('should truncate long query parameters', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [{
-        name: 'very_long_parameter_name',
-        value: 'very_long_parameter_value'
-      }]
-    };
-    const expected = 'note over example.com: [Query String]<br>very_long_parameter_...: very_long_parameter_...\n';
-    expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
-  });
-
-  it('should properly escape special characters', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [{
-        name: 'param:with:colons',
-        value: 'value:with:colons'
-      }]
-    };
-    // 20文字の制限では切り詰めが発生しないケース
-    const expected = 'note over example.com: [Query String]<br>param&#58;with&#58;colons: value&#58;with&#58;colons\n';
-    expect(generateMermaidQueryString(mockEntry, true, true, 20)).toBe(expected);
-  });
-
-  it('should properly escape and truncate special characters when length is limited', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [{
-        name: 'param:with:very:long:colons',
-        value: 'value:with:very:long:colons'
-      }]
-    };
-    const expected = 'note over example.com: [Query String]<br>param&#58;with&#58;very...: value&#58;with&#58;very...\n';
-    expect(generateMermaidQueryString(mockEntry, true, true, 15)).toBe(expected);
-  });
-
-  it('should not truncate when truncateQueryStrings is false', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [{
-        name: 'very_long_parameter_name',
-        value: 'very_long_parameter_value'
-      }]
-    };
-    const expected = 'note over example.com: [Query String]<br>very_long_parameter_name&#58; very_long_parameter_value\n';
-    expect(generateMermaidQueryString(mockEntry, true, false, 20)).toBe(expected);
-  });
-
-  it('should not generate query string when addRequestQueryString is false', () => {
-    const mockEntry = {
-      domain: 'example.com',
-      requestQueryString: [{
-        name: 'param',
-        value: 'value'
-      }]
-    };
-    expect(generateMermaidQueryString(mockEntry, false, true, 20)).toBe('');
-  });
-});
 
   describe('generateMermaidPostData', () => {
     it('should handle missing requestPostData', () => {

@@ -53,12 +53,13 @@
         <span class="">HARlytics</span>
       </div>
       
-      {#if isLive}
-        <Badge large color="indigo" class="ml-4">Cloud Edition</Badge>
-      {/if}
+      
     </div>
     
     <nav class="md:ml-auto flex flex-wrap items-center space-x-2 text-base justify-center">
+      {#if isLive}
+        <Badge large color="indigo" class="ml-4">Cloud Edition</Badge>
+      {/if}
       <Button color="light" size="sm" class=" px-2 py-0" on:click={() => (scrollingModal = true)} autoclose>License</Button>
     </nav>
   </div>

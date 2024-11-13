@@ -19,7 +19,10 @@ export function formatTimestamp(date) {
   }
 
   export const escapeForMermaid = (text) => {
+    if (!text) return '';
+  
     return text
+      // 既存のエスケープ処理
       .replace(/\\/g, '\\\\')   // バックスラッシュ
       .replace(/\$/g, '\\$')    // ドル記号
       .replace(/\#/g, '\\#')    // ハッシュ記号
@@ -39,10 +42,26 @@ export function formatTimestamp(date) {
       .replace(/\</g, '\\<')    // 小なり記号
       .replace(/\n/g, '\\n')    // 改行
       .replace(/\r/g, '\\r')    // 復帰
-      .replace(/\t/g, '\\t')    // タブ
+      .replace(/\t/g, '\\t')    // タブq
       .replace(/\'/g, '\\\'')   // シングルクォート
-      .replace(/\"/g, '\\"');   // ダブルクォート
+      .replace(/\"/g, '\\"')    // ダブルクォート
+      .replace(/:/g, '&#58;')   // コロン
+      .replace(/;/g, '&#59;')   // セミコロン
+      .replace(/@/g, '&#64;')   // アットマーク
+      .replace(/&(?![#a-zA-Z0-9]+;)/g, '&amp;'); // エスケープされていないアンパサンド
   };
+  
+  // 複雑な値の処理用の関数
+  export function truncateAndEscape(str, length) {
+    if (!str) return '';
+    
+    // フォントのクエリパラメータなど、複雑な値の場合は簡略化
+    if (str.includes(';') && str.includes('@')) {
+      return '[Complex Value]';
+    }
+    
+    return escapeForMermaid(truncateText(str, length));
+  }
 
   export function httpStatusCSSClass(statusNo) {
     if (100 <= statusNo && statusNo <= 199) {

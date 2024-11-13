@@ -23,16 +23,40 @@ export function generateMermaidHeaderAndTitle(addTitle, sequenceTitle, addAutoNu
     if (addRequestQueryString && entry.requestQueryString && entry.requestQueryString.length > 0) {
       let requestQueryStringString = '';
       
-      if (truncateQueryStrings) {
-        requestQueryStringString = entry.requestQueryString.map(Qstring => 
-          `${truncateAndEscape(Qstring.name, truncateQueryStringsLength)}: ${truncateAndEscape(Qstring.value, truncateQueryStringsLength)}`
+      // 特別な処理が必要なクエリパラメータかどうかをチェック
+      const isComplexFontQuery = entry.requestQueryString.some(q => 
+        q.name === 'family' && (q.value.includes(';') || q.value.includes('@'))
+      );
+
+      if (isComplexFontQuery) {
+        // フォント関連の複雑なクエリの場合、簡略化して表示
+        requestQueryStringString = entry.requestQueryString.map(qString => {
+          if (qString.name === 'family') {
+            //console.log(`${escapeForMermaid(qString.name)}: ${escapeForMermaid(qString.value)}`);
+            return `${escapeForMermaid(qString.name)}: [Font Family Settings]`;
+          }
+          
+          return `${escapeForMermaid(qString.name)}: ${escapeForMermaid(qString.value)}`;
+          
+        }).join('<br>');
+      } else if (truncateQueryStrings) {
+        // 通常の切り詰め処理
+        requestQueryStringString = entry.requestQueryString.map(qString => 
+          `${truncateAndEscape(qString.name, truncateQueryStringsLength)}: ${truncateAndEscape(qString.value, truncateQueryStringsLength)}`
         ).join('<br>');
       } else {
-        requestQueryStringString = entry.requestQueryString.map(Qstring => {
-          return `${escapeForMermaid(Qstring.name)}&#58; ${escapeForMermaid(Qstring.value)}`;
+        // 通常の処理（切り詰めなし）
+        requestQueryStringString = entry.requestQueryString.map(qString => {
+          const escapedName = escapeForMermaid(qString.name);
+          const escapedValue = escapeForMermaid(qString.value);
+          return `${escapedName}: ${escapedValue}`;
         }).join('<br>');
       }
-      return `note over ${entry.domain}: [Query String]<br>${requestQueryStringString}\n`;
+
+      const result = `note over ${escapeForMermaid(entry.domain)}: [Query String]<br>${requestQueryStringString}\n`;
+      // デバッグ用のログ出力（必要に応じて）
+      // console.log(result);
+      return result;
     }
     return '';
   }
