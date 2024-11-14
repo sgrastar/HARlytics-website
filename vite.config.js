@@ -43,7 +43,7 @@ export default defineConfig({
 			"static/background.js",
       "src/lib/index.js"
 		],
-		reporter: ["html", "clover", "text"],
+		reporter: ["text","json-summary"],
 	},
     setupFiles: ['./tests/setup.js']
   }
