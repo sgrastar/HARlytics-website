@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: "HARlytics"
-  tagline: Making HTTP tell its story
+  tagline: Making HTTP tell its story.
   image:
     src: /icon_128.png
     alt: HARlytics logo
