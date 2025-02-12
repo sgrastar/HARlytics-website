@@ -11,7 +11,7 @@ hero:
   actions:
     - theme: brand
       text: Try it
-      link: https://harlytics.sgrastar.com/
+      link: https://cloud.harlytics.com/
     - theme: alt
       text: Get it on Chrome Store
       link: https://chrome.google.com/webstore/detail/hecpjmmgpbecpeigmoilgcljdkidlbgm
