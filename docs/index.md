@@ -7,7 +7,7 @@ hero:
   tagline: Making HTTP tell its story
   image:
     src: /icon_128.png
-    alt: logo
+    alt: HARlytics logo
   actions:
     - theme: brand
       text: Try it
