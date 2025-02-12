@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: "HARlytics"
-  tagline: Making HTTP tell its story.
+  tagline: A powerful HAR file analyzer that transforms complex HTTP Archive files into actionable insights.
   image:
     src: /icon_128.png
     alt: HARlytics logo
