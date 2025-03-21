@@ -2,8 +2,8 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  title: "HARlytics",
-  description: "HARlytics documents",
+  title: "HARlytics - HAR file viewer & analyzer",
+  description: "A powerful HAR file analyzer that transforms complex HTTP Archive files into actionable insights.",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
