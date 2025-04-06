@@ -8,20 +8,39 @@ export default defineConfig({
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
-      //{ text: 'Examples', link: '/markdown-examples' }
+      { text: 'Docs', link: '/docs/' }
     ],
 
-    /*
+    
     sidebar: [
       {
-        text: 'Examples',
         items: [
-          { text: 'Markdown Examples', link: '/markdown-examples' },
-          { text: 'Runtime API Examples', link: '/api-examples' }
+          { text: 'Introduction', link: '/docs/' },
+        ]
+      },
+      {
+        text: 'Filtering',
+        items: [
+          { text: 'Filtering Capabilities', link: '/docs/filtering-capabilities' },
+        ]
+      },
+      {
+        text: 'Tabs',
+        items: [
+          { text: 'Overview Tab', link: '/docs/overview-tab' },
+          { text: 'Cache/CDN Tab', link: '/docs/cachecdn-tab' },
+          { text: 'Sequence Tab', link: '/docs/sequence-tab' },
+          
+        ]
+      },
+      {
+        items: [
+          { text: 'Libraries and Credits', link: '/docs/libraries-and-credits' },
+          
         ]
       }
-    ],*/
-
+    ],
+    
     socialLinks: [
       { icon: 'github', link: 'https://github.com/sgrastar/HARlytics' }
     ],
