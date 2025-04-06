@@ -4,7 +4,7 @@ HARlytics is built using a combination of powerful open-source libraries and too
 
 ## Core Technologies
 
-- **[Svelte](https://svelte.dev/)** and **[SvelteKit](https://kit.svelte.dev/)**: Reactive UI framework
+- **[Svelte and SvelteKit](https://svelte.dev/)** : Reactive UI framework
 - **[Tailwind CSS](https://tailwindcss.com/)**: Utility-first CSS framework
 - **[Flowbite-Svelte](https://flowbite-svelte.com/)**: UI component library
 
@@ -35,7 +35,7 @@ Copyright (c) 2024 Yuta Hoshina <yuta@sgrastar.org>
 
 ## Contributing
 
-We welcome contributions from the community! If you'd like to contribute, please check out our [GitHub repository](https://github.com/sgrastar/HARlytics) and submit a pull request.
+<!-- We welcome contributions from the community! If you'd like to contribute, please check out our [GitHub repository](https://github.com/sgrastar/HARlytics) and submit a pull request. -->
 
 For feature requests or bug reports, please use our issue templates:
 - [Bug Report](https://github.com/sgrastar/HARlytics/issues/new?template=issue_template_bug_report.yml)
