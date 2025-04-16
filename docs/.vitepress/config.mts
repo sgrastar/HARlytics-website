@@ -36,7 +36,7 @@ export default defineConfig({
       {
         items: [
           { text: 'Libraries and Credits', link: '/docs/libraries-and-credits' },
-          
+          { text: 'Privacy Policy', link: '/docs/privacy-policy' },
         ]
       }
     ],
